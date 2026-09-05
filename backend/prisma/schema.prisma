@@ -1,0 +1,395 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== المستخدمون والصلاحيات ====================
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  MANAGER
+  CASHIER
+}
+
+model Store {
+  id        String   @id
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("stores")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  storeId       String    @default("default-store")
+  username      String    @unique
+  fullName      String
+  passwordHash  String
+  pinHash       String?   // PIN رقمي سريع (4-6 أرقام) لقفل الشاشة وتبديل الكاشير بدون تسجيل خروج كامل
+  role          UserRole  @default(CASHIER)
+  isActive      Boolean   @default(true) // للحظر بدل الحذف الفعلي
+  telegramChatId String?  @unique        // لربط حساب تليغرام للنسخ الاحتياطي
+  telegramLinkToken String? @unique      // توكن مؤقت لربط تليغرام (Deep Link)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  shifts        Shift[]
+  sales         Sale[]
+  expenses      Expense[]
+  auditLogs     AuditLog[]
+
+  @@map("users")
+}
+
+// سجل تدقيق لكل العمليات الحساسة (من نفّذ، ماذا، متى)
+model AuditLog {
+  id          String   @id @default(uuid())
+  storeId     String   @default("default-store")
+  userId      String
+  action      String   // مثال: SALE_CREATED, SALE_REFUNDED, PRICE_EDITED, USER_BLOCKED
+  entityType  String   // مثال: Sale, Product, User
+  entityId    String?
+  details     String?  // JSON نصي يوضح ما تغيّر
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+// ==================== المنتجات والمخزون ====================
+
+model Product {
+  id        String    @id @default(uuid())
+  storeId   String    @default("default-store")
+  name      String
+  category  String
+  imageUrl  String?   // صورة اختيارية للمنتج (Base64) لتسهيل التعرف عليه بشاشة البيع
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  variants  Variant[]
+
+  @@map("products")
+}
+
+model Variant {
+  id             String     @id @default(uuid())
+  storeId        String     @default("default-store")
+  productId      String
+  sku            String     @unique
+  barcode        String?    @unique
+  size           String?    // اختياري - للمنتجات بدون أحجام
+  color          String?    // اختياري - للمنتجات بدون ألوان
+  costPrice      Float
+  sellingPrice   Float
+  wholesalePrice Float?     // سعر الجملة
+  vipPrice       Float?     // سعر VIP
+  stockQuantity  Int        @default(0)
+  minStockLevel  Int        @default(5)
+  batchNumber    String?
+  expiryDate     DateTime?
+  product        Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  saleItems      SaleItem[]
+  purchaseItems  PurchaseInvoiceItem[]
+  stockMovements StockMovement[]
+
+  @@map("variants")
+}
+
+// ==================== الورديات ====================
+
+enum ShiftStatus {
+  OPEN
+  CLOSED
+}
+
+model Shift {
+  id           String      @id @default(uuid())
+  storeId      String      @default("default-store")
+  cashierId    String      // = User.id صاحب الوردية (عزل البيانات)
+  startTime    DateTime    @default(now())
+  endTime      DateTime?
+  initialCash  Float
+  actualCash   Float?
+  expectedCash Float?
+  status       ShiftStatus @default(OPEN)
+  notes        String?
+
+  cashier  User      @relation(fields: [cashierId], references: [id])
+  sales    Sale[]
+  expenses Expense[]
+
+  @@map("shifts")
+  @@index([cashierId, status])
+}
+
+// ==================== المبيعات والاسترجاع ====================
+
+enum PaymentMethod {
+  CASH
+  CARD
+  MOBILE
+  MIXED
+  DEBT
+}
+
+enum RefundStatus {
+  NONE
+  PARTIAL
+  FULL
+}
+
+model Sale {
+  id            String        @id @default(uuid())
+  storeId       String        @default("default-store")
+  shiftId       String
+  userId        String        // منشئ الفاتورة (عزل البيانات)
+  customerId    String?       // العميل عند البيع بالدين
+  totalAmount   Float
+  discount      Float         @default(0)
+  tax           Float         @default(0)
+  paidAmount    Float?
+  cashAmount    Float?
+  cardAmount    Float?
+  mobileAmount  Float?
+  paymentMethod PaymentMethod
+  refundStatus  RefundStatus  @default(NONE)
+  refundedAt    DateTime?
+  refundedBy    String?       // اسم/آيدي الموظف الذي نفذ الاسترجاع
+  refundReason  String?
+  createdAt     DateTime      @default(now())
+
+  shift    Shift      @relation(fields: [shiftId], references: [id])
+  user     User       @relation(fields: [userId], references: [id])
+  customer Customer?  @relation(fields: [customerId], references: [id])
+  items    SaleItem[]
+
+  @@map("sales")
+  @@index([userId])
+  @@index([createdAt])
+  @@index([customerId])
+}
+
+model SaleItem {
+  id          String  @id @default(uuid())
+  storeId     String  @default("default-store")
+  saleId      String
+  variantId   String
+  quantity    Int
+  price       Float
+  unitCostAtSale Float @default(0) // تكلفة الصنف وقت البيع لحساب COGS التاريخي
+  refundedQty Int     @default(0) // لدعم الاسترجاع الجزئي
+  sale        Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  variant     Variant @relation(fields: [variantId], references: [id])
+
+  @@map("sale_items")
+}
+
+// ==================== المصاريف ====================
+
+model Expense {
+  id          String   @id @default(uuid())
+  storeId     String   @default("default-store")
+  shiftId     String?
+  userId      String   // من سجّل المصروف (عزل البيانات)
+  title       String
+  amount      Float
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  shift Shift? @relation(fields: [shiftId], references: [id])
+  user  User   @relation(fields: [userId], references: [id])
+
+  @@map("expenses")
+  @@index([userId])
+}
+
+// ==================== مصمم الأوصلة الحرارية ====================
+
+enum ReceiptType {
+  ALL     // قالب عام لكل العمليات
+  CASH    // نقدي
+  DEBT    // دين
+  REFUND  // مرتجع
+}
+
+model ReceiptTemplate {
+  id         String      @id @default(uuid())
+  storeId    String      @default("default-store")
+  name       String
+  appliesTo  ReceiptType @default(ALL)
+  isDefault  Boolean     @default(false)
+  config     String      // JSON كامل لإعدادات التصميم (شعار Base64، الحقول الظاهرة، ترتيب العناصر...)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@map("receipt_templates")
+  @@index([appliesTo])
+}
+
+model BarcodeLabelTemplate {
+  id         String   @id @default(uuid())
+  storeId    String   @default("default-store")
+  name       String
+  isDefault  Boolean  @default(false)
+  config     String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([isDefault])
+  @@map("barcode_label_templates")
+}
+
+// ==================== الموردون والمشتريات ====================
+
+model Supplier {
+  id        String    @id @default(uuid())
+  storeId   String    @default("default-store")
+  name      String
+  phone     String?
+  address   String?
+  notes     String?
+  createdAt DateTime  @default(now())
+
+  purchaseInvoices PurchaseInvoice[]
+  payments         SupplierPayment[]
+
+  @@map("suppliers")
+}
+
+model PurchaseInvoice {
+  id          String   @id @default(uuid())
+  storeId     String   @default("default-store")
+  supplierId  String
+  userId      String   // من سجّل الفاتورة
+  invoiceNo   String?
+  totalAmount Float
+  paidAmount  Float    @default(0)
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  supplier Supplier              @relation(fields: [supplierId], references: [id])
+  items    PurchaseInvoiceItem[]
+
+  @@map("purchase_invoices")
+  @@index([supplierId])
+}
+
+model PurchaseInvoiceItem {
+  id                String          @id @default(uuid())
+  storeId           String          @default("default-store")
+  purchaseInvoiceId String
+  variantId         String
+  quantity          Int
+  unitCost          Float
+
+  purchaseInvoice PurchaseInvoice @relation(fields: [purchaseInvoiceId], references: [id], onDelete: Cascade)
+  variant         Variant         @relation(fields: [variantId], references: [id])
+
+  @@map("purchase_invoice_items")
+}
+
+// دفعات لتسديد ديون المورد (كشف حساب)
+model SupplierPayment {
+  id         String   @id @default(uuid())
+  storeId    String   @default("default-store")
+  supplierId String
+  userId     String
+  amount     Float
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+
+  @@map("supplier_payments")
+  @@index([supplierId])
+}
+
+// سجل حركة الصنف (بيع، شراء، جرد، تعديل يدوي)
+enum StockMovementType {
+  SALE
+  REFUND
+  PURCHASE
+  COUNT_ADJUSTMENT
+  MANUAL_ADJUSTMENT
+}
+
+model StockMovement {
+  id         String            @id @default(uuid())
+  storeId    String            @default("default-store")
+  variantId  String
+  userId     String
+  type       StockMovementType
+  quantity   Int               // موجب = زيادة، سالب = نقص
+  reason     String?
+  createdAt  DateTime          @default(now())
+
+  variant Variant @relation(fields: [variantId], references: [id])
+
+  @@map("stock_movements")
+  @@index([variantId])
+  @@index([createdAt])
+}
+
+// ==================== إعدادات المحل العامة ====================
+
+model StoreSettings {
+  id             String   @id @default("singleton") // صف واحد فقط لكل النظام
+  storeId        String   @default("default-store")
+  storeName      String   @default("ORANGE")
+  currency       String   @default("IQD")
+  taxEnabled     Boolean  @default(false)
+  taxRate        Float    @default(0) // نسبة مئوية، مثال: 5 = 5%
+  defaultLanguage String  @default("ar") // ar | en
+  dbBackupDir    String?  // مسار مجلد النسخ الاحتياطي المحلي لقاعدة البيانات (قرص خارجي/مزامنة)
+  secondaryCurrencyEnabled Boolean @default(false)
+  secondaryCurrency        String? // مثال: USD
+  exchangeRate             Float?  // كم يساوي 1 من العملة الثانوية بالعملة الأساسية (مثال: 1 USD = 1310 IQD)
+  telegramBotToken         String?
+  telegramChatId           String?
+  licenseKey             String?  // مفتاح ترخيص التفعيل المُدخَل
+  licenseActivatedAt     DateTime?
+  updatedAt      DateTime @updatedAt
+
+  @@map("store_settings")
+}
+
+// ==================== العملاء والبيع بالدين ====================
+
+model Customer {
+  id        String   @id @default(uuid())
+  storeId   String   @default("default-store")
+  name      String
+  phone     String?
+  notes     String?
+  createdAt DateTime @default(now())
+
+  sales    Sale[]
+  payments CustomerPayment[]
+
+  @@map("customers")
+}
+
+// دفعات تسديد دين العميل
+model CustomerPayment {
+  id         String   @id @default(uuid())
+  storeId    String   @default("default-store")
+  customerId String
+  userId     String
+  amount     Float
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@map("customer_payments")
+  @@index([customerId])
+}

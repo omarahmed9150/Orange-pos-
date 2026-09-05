@@ -1,0 +1,84 @@
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { StockMovementType } from '@prisma/client';
+import { PrismaService } from '../../prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
+import { StockCountDto } from './dto/stock-count.dto';
+
+@Injectable()
+export class InventoryService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
+
+  /** تنبيهات: نفاد أو انخفاض المخزون + قرب انتهاء الصلاحية (خلال 15 يوم) + منتهية فعلاً */
+  async getAlerts() {
+    const now = new Date();
+    const in15Days = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
+
+    const [allVariants, expiringSoon, expired] = await Promise.all([
+      this.prisma.variant.findMany({ include: { product: true } }),
+      this.prisma.variant.findMany({
+        where: { expiryDate: { gte: now, lte: in15Days } },
+        include: { product: true },
+      }),
+      this.prisma.variant.findMany({
+        where: { expiryDate: { lt: now, not: null } },
+        include: { product: true },
+      }),
+    ]);
+
+    // مقارنة حقلين (stockQuantity <= minStockLevel) غير مدعومة مباشرة في SQLite عبر Prisma -> فلترة يدوية
+    const lowStock = allVariants.filter((v) => v.stockQuantity <= v.minStockLevel);
+
+    return { lowStock, expiringSoon, expired };
+  }
+
+  /** سجل حركة صنف معيّن (بيع/شراء/جرد/تعديل يدوي) */
+  movementHistory(variantId: string) {
+    return this.prisma.stockMovement.findMany({
+      where: { variantId },
+      include: { variant: { include: { product: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+  }
+
+  /** جرد كامل أو جزئي: يقارن الكمية المسجّلة بالمعدودة فعلياً ويعدّل الفرق + يسجّل الحركة */
+  async applyStockCount(dto: StockCountDto, userId: string) {
+    const results: { variantId: string; before: number; after: number; diff: number }[] = [];
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const line of dto.lines) {
+        const variant = await tx.variant.findUnique({ where: { id: line.variantId } });
+        if (!variant) continue;
+
+        const diff = line.countedQuantity - variant.stockQuantity;
+        if (diff !== 0) {
+          const updated = await tx.variant.updateMany({
+            where: { id: line.variantId, stockQuantity: variant.stockQuantity },
+            data: { stockQuantity: line.countedQuantity },
+          });
+          if (updated.count !== 1) throw new BadRequestException('تغير المخزون أثناء الجرد، أعد المحاولة');
+          await tx.stockMovement.create({
+            data: {
+              variantId: line.variantId,
+              userId,
+              type: StockMovementType.COUNT_ADJUSTMENT,
+              quantity: diff,
+              reason: 'تسوية جرد',
+            },
+          });
+        }
+        results.push({ variantId: line.variantId, before: variant.stockQuantity, after: line.countedQuantity, diff });
+      }
+    });
+
+    await this.audit.log(userId, 'STOCK_COUNT_APPLIED', 'Inventory', undefined, {
+      linesCount: dto.lines.length,
+      adjustedCount: results.filter((r) => r.diff !== 0).length,
+    });
+
+    return results;
+  }
+}

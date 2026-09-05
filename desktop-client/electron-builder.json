@@ -1,0 +1,48 @@
+{
+  "appId": "com.orange.pos.terminal",
+  "productName": "ORANGE POS",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist/**/*",
+    "dist-electron/**/*"
+  ],
+  "extraResources": [
+    {
+      "from": "../backend/dist",
+      "to": "backend/dist"
+    },
+    {
+      "from": "../backend/node_modules",
+      "to": "backend/node_modules"
+    },
+    {
+      "from": "../backend/prisma",
+      "to": "backend/prisma"
+    },
+    {
+      "from": "../backend/orange.db",
+      "to": "backend/orange.db"
+    }
+  ],
+  "publish": {
+    "provider": "github",
+    "owner": "REPLACE_WITH_YOUR_GITHUB_USERNAME",
+    "repo": "REPLACE_WITH_YOUR_REPO_NAME"
+  },
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      }
+    ]
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true
+  }
+}

@@ -1,0 +1,31 @@
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import App from './App';
+import { AuthProvider } from './context/AuthContext';
+import { I18nProvider } from './context/I18nContext';
+import { ProductCacheProvider } from './context/ProductCacheContext';
+import { LicenseGate } from './components/LicenseGate';
+import './index.css';
+
+if (import.meta.env.PROD && (window.location.protocol === 'http:' || window.location.protocol === 'https:') && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js').catch(() => undefined);
+  });
+}
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <LicenseGate>
+      <BrowserRouter>
+        <I18nProvider>
+          <AuthProvider>
+            <ProductCacheProvider>
+              <App />
+            </ProductCacheProvider>
+          </AuthProvider>
+        </I18nProvider>
+      </BrowserRouter>
+    </LicenseGate>
+  </React.StrictMode>,
+);
