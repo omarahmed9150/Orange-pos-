@@ -23,20 +23,25 @@ import { SetupPage } from './pages/SetupPage';
 
 export default function App() {
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
+  const [setupCheckError, setSetupCheckError] = useState<string | null>(null);
 
   useEffect(() => {
     const checkSetupStatus = async () => {
       try {
         const apiBaseUrl = import.meta.env.VITE_API_URL || '/api';
         const response = await fetch(`${apiBaseUrl}/check-setup`);
+        if (!response.ok) {
+          throw new Error(`Backend returned HTTP ${response.status}`);
+        }
         const data = await response.json();
 
         // التحقق مما إذا كان النظام يحتاج إعداداً بأي طريقة من قيم الاستجابة
         const isSetupNeeded = data.needsSetup ?? (data.isConfigured !== undefined ? !data.isConfigured : false);
+        setSetupCheckError(null);
         setNeedsSetup(Boolean(isSetupNeeded));
       } catch (error) {
         console.error('خطأ في الاتصال بالـ Backend:', error);
-        setNeedsSetup(false);
+        setSetupCheckError('تعذر الاتصال بخادم النظام للتحقق من الإعدادات.');
       }
     };
 
@@ -46,7 +51,10 @@ export default function App() {
   if (needsSetup === null) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', direction: 'rtl', fontFamily: 'sans-serif' }}>
-        <h3>جاري التحقق من إعدادات النظام...</h3>
+        <div style={{ textAlign: 'center' }}>
+          <h3>{setupCheckError ?? 'جاري التحقق من إعدادات النظام...'}</h3>
+          {setupCheckError && <p>يرجى التأكد من اتصال الخادم ثم إعادة تحميل الصفحة.</p>}
+        </div>
       </div>
     );
   }
