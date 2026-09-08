@@ -1,6 +1,6 @@
 {
   "name": "orange-pos-desktop",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "ORANGE - واجهة نقطة البيع (Electron + React)",
   "private": true,
   "main": "dist-electron/main.js",
