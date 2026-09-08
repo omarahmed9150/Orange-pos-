@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_BASE_URL } from '../lib/api';
 
 interface SetupPageProps {
   onSetupComplete: () => void;
@@ -33,9 +34,7 @@ export const SetupPage: React.FC<SetupPageProps> = ({ onSetupComplete }) => {
     setLoading(true);
 
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'https://backend-nine-swart-94.vercel.app';
-      const apiBaseUrl = apiUrl.endsWith('/api') ? apiUrl : `${apiUrl}/api`;
-      const response = await fetch(`${apiBaseUrl}/setup-admin`, {
+      const response = await fetch(`${API_BASE_URL}/setup-admin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: username.trim(), password }),

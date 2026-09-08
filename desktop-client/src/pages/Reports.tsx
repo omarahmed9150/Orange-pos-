@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api } from '../lib/api';
+import { api, API_BASE_URL } from '../lib/api';
 
 interface Summary {
   revenue: number; cogs: number; grossProfit: number; expenses: number; netProfit: number; salesCount: number;
@@ -37,7 +37,7 @@ export function Reports() {
   function exportExcel() {
     const params = new URLSearchParams({ from: from || '', to: to || '' });
     const token = localStorage.getItem('orange_token');
-    const url = `/api/reports/export/excel?${params}`;
+    const url = `${API_BASE_URL}/reports/export/excel?${params}`;
     fetch(url, { headers: { Authorization: `Bearer ${token}` } })
       .then((res) => res.blob())
       .then((blob) => {

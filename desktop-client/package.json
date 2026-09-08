@@ -1,14 +1,13 @@
 {
   "name": "orange-pos-desktop",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "ORANGE - واجهة نقطة البيع (Electron + React)",
   "private": true,
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
-    "build:backend": "npm --prefix ../backend run build && node scripts/prepare-backend-runtime.cjs",
     "build:web": "tsc -p tsconfig.json && vite build",
-    "build": "npm run build:backend && tsc -p tsconfig.json && vite build && tsc -p electron/tsconfig.json && electron-builder --config.win.signAndEditExecutable=false",
+    "build": "tsc -p tsconfig.json && vite build && tsc -p electron/tsconfig.json && electron-builder --config.win.signAndEditExecutable=false",
     "electron:dev": "concurrently \"vite\" \"electron .\"",
     "electron:build": "npm run build"
   },
@@ -26,15 +25,7 @@
     ],
     "files": [
       "dist/**/*",
-      "dist-electron/**/*",
-      "build/**/*",
-      "public/**/*"
-    ],
-    "extraResources": [
-      {
-        "from": "../backend-runtime",
-        "to": "backend"
-      }
+      "dist-electron/**/*"
     ],
     "win": {
       "icon": "build/icon.ico",
@@ -49,7 +40,8 @@
       "createStartMenuShortcut": true,
       "shortcutName": "ORANGE POS",
       "installerIcon": "build/icon.ico",
-      "uninstallerIcon": "build/icon.ico"
+      "uninstallerIcon": "build/icon.ico",
+      "uninstallDisplayName": "ORANGE POS"
     }
   },
   "dependencies": {

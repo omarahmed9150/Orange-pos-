@@ -37,7 +37,7 @@ process.on('uncaughtException', showFatalError);
 process.on('unhandledRejection', showFatalError);
 
 function createMainWindow() {
-  const iconPath = path.join(__dirname, '../public/icon.png');
+  const iconPath = path.join(__dirname, '../dist/icon.png');
   const windowOptions: BrowserWindowConstructorOptions = {
     width: 1920,
     height: 1080,
@@ -45,6 +45,7 @@ function createMainWindow() {
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
+      webSecurity: false,
       contextIsolation: true,
       nodeIntegration: false,
     },

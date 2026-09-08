@@ -20,6 +20,7 @@ import { AuditLog } from './pages/AuditLog';
 import { ReceiptDesigner } from './pages/ReceiptDesigner';
 import { Users } from './pages/Users';
 import { SetupPage } from './pages/SetupPage';
+import { API_BASE_URL } from './lib/api';
 
 export default function App() {
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
@@ -28,9 +29,7 @@ export default function App() {
   useEffect(() => {
     const checkSetupStatus = async () => {
       try {
-        const API_URL = import.meta.env.VITE_API_URL || 'https://backend-nine-swart-94.vercel.app';
-        const apiBaseUrl = API_URL.endsWith('/api') ? API_URL : `${API_URL}/api`;
-        const response = await fetch(`${apiBaseUrl}/check-setup`);
+        const response = await fetch(`${API_BASE_URL}/check-setup`);
         if (!response.ok) {
           throw new Error(`Backend returned HTTP ${response.status}`);
         }

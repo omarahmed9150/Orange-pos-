@@ -1,7 +1,6 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://backend-nine-swart-94.vercel.app';
-export const API_BASE_URL = API_URL.endsWith('/api') ? API_URL : `${API_URL}/api`;
+export const API_BASE_URL = 'https://backend-nine-swart-94.vercel.app/api';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
