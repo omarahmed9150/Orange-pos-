@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
-import { autoUpdater } from 'electron-updater';
+
+type AutoUpdater = typeof import('electron-updater').autoUpdater;
 
 /**
  * التحديث التلقائي: يفحص عند بدء التشغيل، يُنزّل التحديث بصمت بالخلفية،
@@ -10,6 +11,15 @@ import { autoUpdater } from 'electron-updater';
  */
 export function initAutoUpdater(mainWindow: BrowserWindow) {
   if (!app.isPackaged) return; // لا تحديث تلقائي أثناء التطوير
+
+  let autoUpdater: AutoUpdater;
+  try {
+    // Keep the packaged app usable when the optional update service is unavailable.
+    autoUpdater = require('electron-updater').autoUpdater as AutoUpdater;
+  } catch (error) {
+    console.error('Auto-update module unavailable:', error);
+    return;
+  }
 
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = false;

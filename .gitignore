@@ -11,3 +11,4 @@ desktop-client/.env
 *.log
 license.json
 jwt-secret
+backend-runtime/

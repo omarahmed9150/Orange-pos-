@@ -6,24 +6,13 @@
   },
   "files": [
     "dist/**/*",
-    "dist-electron/**/*"
+    "dist-electron/**/*",
+    "build/**/*"
   ],
   "extraResources": [
     {
-      "from": "../backend/dist",
-      "to": "backend/dist"
-    },
-    {
-      "from": "../backend/node_modules",
-      "to": "backend/node_modules"
-    },
-    {
-      "from": "../backend/prisma",
-      "to": "backend/prisma"
-    },
-    {
-      "from": "../backend/orange.db",
-      "to": "backend/orange.db"
+      "from": "../backend-runtime",
+      "to": "backend"
     }
   ],
   "publish": {
@@ -32,6 +21,7 @@
     "repo": "REPLACE_WITH_YOUR_REPO_NAME"
   },
   "win": {
+    "icon": "build/icon.ico",
     "target": [
       {
         "target": "nsis",
@@ -40,6 +30,8 @@
     ]
   },
   "nsis": {
+    "installerIcon": "build/icon.ico",
+    "uninstallerIcon": "build/icon.ico",
     "oneClick": false,
     "allowToChangeInstallationDirectory": true,
     "createDesktopShortcut": true,

@@ -1,7 +1,12 @@
 import axios from 'axios';
 
+const isFileProtocol = window.location.protocol === 'file:';
+const apiBaseUrl = isFileProtocol
+  ? 'http://127.0.0.1:3000/api'
+  : (import.meta.env.VITE_API_URL || '/api');
+
 export const api = axios.create({
-  baseURL: '/api',
+  baseURL: apiBaseUrl,
 });
 
 // إرفاق توكن الدخول تلقائياً بكل طلب

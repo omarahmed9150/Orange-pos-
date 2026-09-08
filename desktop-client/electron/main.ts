@@ -1,4 +1,5 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, BrowserWindowConstructorOptions } from 'electron';
+import fs from 'fs';
 import path from 'path';
 import { getLicenseStatus, activateLicense } from './license';
 import { initAutoUpdater } from './updater';
@@ -7,9 +8,38 @@ import { startBackend, stopBackend } from './backend-launcher';
 const isDev = !app.isPackaged;
 
 let mainWindow: BrowserWindow | null = null;
+let errorWindow: BrowserWindow | null = null;
+
+function showFatalError(error: unknown) {
+  const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  console.error('Fatal Electron error:', message);
+  if (!app.isReady()) return;
+  if (errorWindow && !errorWindow.isDestroyed()) {
+    errorWindow.focus();
+    return;
+  }
+  errorWindow = new BrowserWindow({
+    width: 760,
+    height: 460,
+    resizable: false,
+    autoHideMenuBar: true,
+    webPreferences: { contextIsolation: true, nodeIntegration: false },
+  });
+  errorWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(`
+    <!doctype html><meta charset="utf-8"><title>ORANGE POS</title>
+    <style>body{font-family:Arial,sans-serif;padding:32px;background:#fff7ed;color:#431407}
+    h1{color:#ea580c}pre{white-space:pre-wrap;background:#ffedd5;padding:16px;border-radius:8px}</style>
+    <h1>تعذر تشغيل ORANGE POS</h1><p>حدث خطأ أثناء تشغيل التطبيق. أغلق النافذة وأعد المحاولة.</p>
+    <pre>${message.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char] || char))}</pre>
+  `)}`);
+}
+
+process.on('uncaughtException', showFatalError);
+process.on('unhandledRejection', showFatalError);
 
 function createMainWindow() {
-  mainWindow = new BrowserWindow({
+  const iconPath = path.join(__dirname, '../build/icon.ico');
+  const windowOptions: BrowserWindowConstructorOptions = {
     width: 1920,
     height: 1080,
     fullscreen: true,
@@ -19,6 +49,11 @@ function createMainWindow() {
       contextIsolation: true,
       nodeIntegration: false,
     },
+  };
+  if (fs.existsSync(iconPath)) windowOptions.icon = iconPath;
+
+  mainWindow = new BrowserWindow({
+    ...windowOptions,
   });
 
   if (isDev) {
@@ -111,9 +146,13 @@ function printReceipt(htmlContent: string): Promise<void> {
 }
 
 app.whenReady().then(async () => {
-  await startBackend(); // ينتظر جاهزية الـ Backend قبل فتح النافذة (حتى لا تظهر شاشة فارغة/فاشلة)
-  createMainWindow();
-  if (mainWindow) initAutoUpdater(mainWindow);
+  try {
+    await startBackend(); // ينتظر جاهزية الـ Backend قبل فتح النافذة (حتى لا تظهر شاشة فارغة/فاشلة)
+    createMainWindow();
+    if (mainWindow) initAutoUpdater(mainWindow);
+  } catch (error) {
+    showFatalError(error);
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

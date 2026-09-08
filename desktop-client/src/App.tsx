@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -18,8 +19,42 @@ import { Reports } from './pages/Reports';
 import { AuditLog } from './pages/AuditLog';
 import { ReceiptDesigner } from './pages/ReceiptDesigner';
 import { Users } from './pages/Users';
+import { SetupPage } from './pages/SetupPage';
 
 export default function App() {
+  const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const checkSetupStatus = async () => {
+      try {
+        const apiBaseUrl = import.meta.env.VITE_API_URL || '/api';
+        const response = await fetch(`${apiBaseUrl}/check-setup`);
+        const data = await response.json();
+
+        // التحقق مما إذا كان النظام يحتاج إعداداً بأي طريقة من قيم الاستجابة
+        const isSetupNeeded = data.needsSetup ?? (data.isConfigured !== undefined ? !data.isConfigured : false);
+        setNeedsSetup(Boolean(isSetupNeeded));
+      } catch (error) {
+        console.error('خطأ في الاتصال بالـ Backend:', error);
+        setNeedsSetup(false);
+      }
+    };
+
+    checkSetupStatus();
+  }, []);
+
+  if (needsSetup === null) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', direction: 'rtl', fontFamily: 'sans-serif' }}>
+        <h3>جاري التحقق من إعدادات النظام...</h3>
+      </div>
+    );
+  }
+
+  if (needsSetup) {
+    return <SetupPage onSetupComplete={() => setNeedsSetup(false)} />;
+  }
+
   return (
     <Routes>
       <Route path="/login" element={<Login />} />

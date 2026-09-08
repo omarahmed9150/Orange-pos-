@@ -27,17 +27,24 @@ function getBackendResourcesPath(): string {
 
 function ensureWritableDatabase(backendResourcesPath: string): string {
   const userDataDir = app.getPath('userData');
+  fs.mkdirSync(userDataDir, { recursive: true });
   const dbPath = path.join(userDataDir, 'orange.db');
 
   if (!fs.existsSync(dbPath)) {
     const templateDbPath = path.join(backendResourcesPath, 'orange.db');
-    if (fs.existsSync(templateDbPath)) {
-      fs.copyFileSync(templateDbPath, dbPath);
+    const legacyTemplateDbPath = path.join(backendResourcesPath, 'prisma', 'orange.db');
+    const sourceDbPath = fs.existsSync(templateDbPath) ? templateDbPath : legacyTemplateDbPath;
+    if (fs.existsSync(sourceDbPath)) {
+      fs.copyFileSync(sourceDbPath, dbPath);
     }
-
   }
 
   return dbPath;
+}
+
+function buildSqliteDatabaseUrl(dbPath: string): string {
+  const normalized = dbPath.replace(/\\/g, '/');
+  return `file:${normalized}`;
 }
 
 function getInstanceJwtSecret(): string {
@@ -88,6 +95,7 @@ export async function startBackend(): Promise<void> {
   const dbPath = ensureWritableDatabase(backendResourcesPath);
   const jwtSecret = getInstanceJwtSecret();
   const entryFile = path.join(backendResourcesPath, 'dist', 'main.js');
+  const databaseUrl = buildSqliteDatabaseUrl(dbPath);
 
   if (!fs.existsSync(entryFile)) {
     console.error('ملفات الـ Backend المبنية غير موجودة داخل حزمة التثبيت:', entryFile);
@@ -99,22 +107,35 @@ export async function startBackend(): Promise<void> {
     env: {
       ...process.env,
       ELECTRON_RUN_AS_NODE: '1', // يجعل Electron يعمل كمحرّك Node عادي بدل فتح نافذة
-      DATABASE_URL: `file:${dbPath}`,
+      DATABASE_URL: databaseUrl,
       JWT_SECRET: process.env.JWT_SECRET && !process.env.JWT_SECRET.includes('CHANGE_ME')
         ? process.env.JWT_SECRET
         : jwtSecret,
       PORT: '3000',
     },
-    stdio: 'ignore',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+
+  let stderr = '';
+  backendProcess.stderr?.setEncoding('utf8');
+  backendProcess.stderr?.on('data', (chunk: string) => {
+    stderr += chunk;
+    console.error(`[Backend] ${chunk.trimEnd()}`);
+  });
+  backendProcess.stdout?.setEncoding('utf8');
+  backendProcess.stdout?.on('data', (chunk: string) => {
+    console.log(`[Backend] ${chunk.trimEnd()}`);
   });
 
   backendProcess.on('exit', (code) => {
-    if (code !== 0) console.error(`توقّف سيرفر الـ Backend بشكل غير متوقع (code: ${code})`);
+    if (code !== 0) {
+      console.error(`توقّف سيرفر الـ Backend بشكل غير متوقع (code: ${code})`, stderr);
+    }
   });
 
   const ready = await waitForHealth(3000, 15000);
   if (!ready) {
-    console.error('لم يستجب Backend خلال المهلة المحددة');
+    console.error('لم يستجب Backend خلال المهلة المحددة', stderr);
     stopBackend();
     throw new Error('Backend failed to start');
   }
