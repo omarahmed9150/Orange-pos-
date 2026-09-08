@@ -1,5 +1,6 @@
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
 import { api } from '../lib/api';
+import { API_BASE_URL } from '../lib/api';
 import { useProductCache } from '../context/ProductCacheContext';
 import { Link } from 'react-router-dom';
 
@@ -90,7 +91,7 @@ export function Products() {
 
   async function downloadTemplate() {
     const token = localStorage.getItem('orange_token');
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/products/import-template`, {
+    const res = await fetch(`${API_BASE_URL}/products/import-template`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const blob = await res.blob();

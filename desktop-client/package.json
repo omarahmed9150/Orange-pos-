@@ -27,7 +27,8 @@
     "files": [
       "dist/**/*",
       "dist-electron/**/*",
-      "build/**/*"
+      "build/**/*",
+      "public/**/*"
     ],
     "extraResources": [
       {

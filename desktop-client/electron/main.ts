@@ -3,7 +3,6 @@ import fs from 'fs';
 import path from 'path';
 import { getLicenseStatus, activateLicense } from './license';
 import { initAutoUpdater } from './updater';
-import { startBackend, stopBackend } from './backend-launcher';
 
 const isDev = !app.isPackaged;
 
@@ -38,7 +37,7 @@ process.on('uncaughtException', showFatalError);
 process.on('unhandledRejection', showFatalError);
 
 function createMainWindow() {
-  const iconPath = path.join(__dirname, '../build/icon.ico');
+  const iconPath = path.join(__dirname, '../public/icon.png');
   const windowOptions: BrowserWindowConstructorOptions = {
     width: 1920,
     height: 1080,
@@ -146,13 +145,8 @@ function printReceipt(htmlContent: string): Promise<void> {
 }
 
 app.whenReady().then(async () => {
-  try {
-    await startBackend(); // ينتظر جاهزية الـ Backend قبل فتح النافذة (حتى لا تظهر شاشة فارغة/فاشلة)
-    createMainWindow();
-    if (mainWindow) initAutoUpdater(mainWindow);
-  } catch (error) {
-    showFatalError(error);
-  }
+  createMainWindow();
+  if (mainWindow) initAutoUpdater(mainWindow);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -161,12 +155,7 @@ app.whenReady().then(async () => {
   });
 });
 
-app.on('before-quit', () => {
-  stopBackend();
-});
-
 app.on('window-all-closed', () => {
-  stopBackend();
   if (process.platform !== 'darwin') app.quit();
 });
 
