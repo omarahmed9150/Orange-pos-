@@ -31,15 +31,16 @@ export class ReportsService {
   }
 
   /** فصل مالي دقيق: Revenue, COGS, Gross Profit, Expenses, Net Profit */
-  async financialSummary(from?: string, to?: string) {
+  async financialSummary(from?: string, to?: string, storeId?: string) {
+    if (!storeId) throw new BadRequestException('المتجر غير محدد');
     const { from: gte, to: lte } = this.range(from, to);
 
     const sales = await this.prisma.sale.findMany({
-      where: { createdAt: { gte, lte } },
+      where: { storeId, createdAt: { gte, lte } },
       include: { items: { include: { variant: true } } },
     });
 
-    const expenses = await this.prisma.expense.findMany({ where: { createdAt: { gte, lte } } });
+    const expenses = await this.prisma.expense.findMany({ where: { storeId, createdAt: { gte, lte } } });
 
     let revenue = 0;
     let cogs = 0;
@@ -68,13 +69,14 @@ export class ReportsService {
   }
 
   /** المنتجات الأكثر مبيعاً (حسب الكمية المباعة الصافية) */
-  async topProducts(from?: string, to?: string, limit = 10) {
+  async topProducts(from?: string, to?: string, limit = 10, storeId?: string) {
+    if (!storeId) throw new BadRequestException('المتجر غير محدد');
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
       throw new BadRequestException('حد التقرير يجب أن يكون بين 1 و100');
     }
     const { from: gte, to: lte } = this.range(from, to);
     const items = await this.prisma.saleItem.findMany({
-      where: { sale: { createdAt: { gte, lte } } },
+      where: { storeId, sale: { storeId, createdAt: { gte, lte } } },
       include: { variant: { include: { product: true } } },
     });
 
@@ -94,20 +96,21 @@ export class ReportsService {
   }
 
   /** الأصناف الراكدة: أصناف لم تُبع إطلاقاً خلال الفترة رغم وجود مخزون */
-  async slowMovingProducts(from?: string, to?: string) {
+  async slowMovingProducts(from?: string, to?: string, storeId?: string) {
+    if (!storeId) throw new BadRequestException('المتجر غير محدد');
     const { from: gte, to: lte } = this.range(from, to);
 
     const soldVariantIds = new Set(
       (
         await this.prisma.saleItem.findMany({
-          where: { sale: { createdAt: { gte, lte } } },
+          where: { storeId, sale: { storeId, createdAt: { gte, lte } } },
           select: { variantId: true },
         })
       ).map((i) => i.variantId),
     );
 
     const allVariants = await this.prisma.variant.findMany({
-      where: { stockQuantity: { gt: 0 } },
+      where: { storeId, stockQuantity: { gt: 0 } },
       include: { product: true },
     });
 
@@ -117,11 +120,12 @@ export class ReportsService {
   }
 
   /** أداء الموظفين: عدد الفواتير وإجمالي المبيعات لكل موظف */
-  async employeePerformance(from?: string, to?: string) {
+  async employeePerformance(from?: string, to?: string, storeId?: string) {
+    if (!storeId) throw new BadRequestException('المتجر غير محدد');
     const { from: gte, to: lte } = this.range(from, to);
 
     const sales = await this.prisma.sale.findMany({
-      where: { createdAt: { gte, lte }, refundStatus: { not: RefundStatus.FULL } },
+      where: { storeId, createdAt: { gte, lte }, refundStatus: { not: RefundStatus.FULL } },
       include: { user: { select: { id: true, fullName: true, username: true } } },
     });
 
@@ -137,7 +141,8 @@ export class ReportsService {
   }
 
   /** اتجاه المبيعات اليومي لآخر N يوم (كل الورديات وكل المستخدمين) - لرسم بياني بلوحة التحكم */
-  async salesTrend(days = 7) {
+  async salesTrend(days = 7, storeId?: string) {
+    if (!storeId) throw new BadRequestException('المتجر غير محدد');
     if (!Number.isInteger(days) || days < 1 || days > 366) {
       throw new BadRequestException('عدد الأيام يجب أن يكون بين 1 و366');
     }
@@ -146,7 +151,7 @@ export class ReportsService {
     start.setDate(start.getDate() - (days - 1));
 
     const sales = await this.prisma.sale.findMany({
-      where: { createdAt: { gte: start }, refundStatus: { not: RefundStatus.FULL } },
+      where: { storeId, createdAt: { gte: start }, refundStatus: { not: RefundStatus.FULL } },
       select: { totalAmount: true, createdAt: true },
     });
 
@@ -167,12 +172,12 @@ export class ReportsService {
   }
 
   /** يبني ملف Excel كامل (ملخص مالي + الأكثر مبيعاً + الراكد + أداء الموظفين) ويرجّع مسار الملف المؤقت */
-  async exportToExcel(from?: string, to?: string) {
+  async exportToExcel(from?: string, to?: string, storeId?: string) {
     const [summary, top, slow, employees] = await Promise.all([
-      this.financialSummary(from, to),
-      this.topProducts(from, to, 20),
-      this.slowMovingProducts(from, to),
-      this.employeePerformance(from, to),
+      this.financialSummary(from, to, storeId),
+      this.topProducts(from, to, 20, storeId),
+      this.slowMovingProducts(from, to, storeId),
+      this.employeePerformance(from, to, storeId),
     ]);
 
     const workbook = new ExcelJS.Workbook();

@@ -95,8 +95,8 @@ export class ProductsController {
   @Patch(':id/image')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'تحديث أو حذف صورة المنتج' })
-  updateImage(@Param('id') id: string, @Body() dto: UpdateProductImageDto) {
-    return this.productsService.updateImage(id, dto.imageUrl ?? null);
+  updateImage(@Param('id') id: string, @Body() dto: UpdateProductImageDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.productsService.updateImage(id, dto.imageUrl ?? null, user.storeId);
   }
 
   @Patch('variants/:variantId/quick-update')
@@ -107,6 +107,6 @@ export class ProductsController {
     @Body() dto: QuickUpdateVariantDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.productsService.quickUpdateVariant(variantId, dto, user.userId);
+    return this.productsService.quickUpdateVariant(variantId, dto, user.userId, user.storeId);
   }
 }

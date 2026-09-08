@@ -40,17 +40,13 @@ export class SalesService {
       if (!customer) throw new NotFoundException('العميل غير موجود');
     }
 
-    const shift = await this.prisma.shift.findUnique({ where: { id: dto.shiftId } });
-
-    if (!shift || (shift.storeId && shift.storeId !== storeId)) {
-      throw new NotFoundException(`Shift ${dto.shiftId} not found`);
-    }
-
-    if (shift.status !== ShiftStatus.OPEN) {
-      throw new BadRequestException('Cannot create sale on a closed shift');
-    }
-    if (shift.cashierId !== userId) {
-      throw new BadRequestException('لا يمكن تسجيل مبيعات على وردية مستخدم آخر');
+    let shift = await this.prisma.shift.findFirst({
+      where: { id: dto.shiftId, storeId, cashierId: userId, status: ShiftStatus.OPEN },
+    });
+    if (!shift) {
+      shift = await this.prisma.shift.create({
+        data: { storeId, cashierId: userId, initialCash: 0, status: ShiftStatus.OPEN },
+      });
     }
 
     const variantIds = dto.items.map((item) => item.variantId);
@@ -100,6 +96,7 @@ export class SalesService {
         }
         await tx.stockMovement.create({
           data: {
+            storeId,
             variantId: item.variantId,
             userId,
             type: StockMovementType.SALE,
@@ -112,7 +109,7 @@ export class SalesService {
       return tx.sale.create({
         data: {
           storeId,
-          shiftId: dto.shiftId,
+          shiftId: shift.id,
           userId,
           customerId: dto.customerId,
           totalAmount,
@@ -131,6 +128,7 @@ export class SalesService {
                 quantity: item.quantity,
                 price: resolvePrice(variant, item.priceTier as PriceTier, item.overridePrice),
                 unitCostAtSale: variant.costPrice,
+                storeId,
               };
             }),
           },
@@ -153,11 +151,12 @@ export class SalesService {
    * عزل البيانات: الكاشير يرى فواتيره فقط.
    * الأدوار الإدارية (Admin/Manager/SuperAdmin) ترى كل الفواتير.
    */
-  findByShift(shiftId: string, requester: { userId: string; role: UserRole }) {
+  findByShift(shiftId: string, requester: { userId: string; role: UserRole; storeId?: string }) {
     const isPrivileged = requester.role !== UserRole.CASHIER;
     return this.prisma.sale.findMany({
       where: {
         shiftId,
+        ...(requester.storeId ? { storeId: requester.storeId } : {}),
         ...(isPrivileged ? {} : { userId: requester.userId }),
       },
       include: {
@@ -168,9 +167,9 @@ export class SalesService {
     });
   }
 
-  async findOne(id: string, requester: { userId: string; role: UserRole }) {
+  async findOne(id: string, requester: { userId: string; role: UserRole; storeId?: string }) {
     const sale = await this.prisma.sale.findUnique({
-      where: { id },
+      where: { id, ...(requester.storeId ? { storeId: requester.storeId } : {}) },
       include: {
         items: { include: { variant: { include: { product: true } } } },
       },
@@ -189,9 +188,9 @@ export class SalesService {
   }
 
   /** استرجاع كامل أو جزئي مع منع تكرار الاسترجاع وإعادة الكمية للمخزون */
-  async refund(id: string, dto: RefundSaleDto, actor: { userId: string; username: string }) {
+  async refund(id: string, dto: RefundSaleDto, actor: { userId: string; username: string; storeId?: string }) {
     const sale = await this.prisma.sale.findUnique({
-      where: { id },
+      where: { id, ...(actor.storeId ? { storeId: actor.storeId } : {}) },
       include: { items: true },
     });
 
@@ -277,15 +276,15 @@ export class SalesService {
    * الاستبدال: يرجّع أصنافاً من فاتورة أصلية ويستبدلها بأصناف جديدة في فاتورة منفصلة،
    * مع حساب فرق السعر تلقائياً (المبلغ المطلوب من الزبون أو المبلغ الواجب إرجاعه له).
    */
-  async exchange(id: string, dto: ExchangeSaleDto, actor: { userId: string; username: string }) {
+  async exchange(id: string, dto: ExchangeSaleDto, actor: { userId: string; username: string; storeId?: string }) {
     const originalSale = await this.prisma.sale.findUnique({
-      where: { id },
+      where: { id, ...(actor.storeId ? { storeId: actor.storeId } : {}) },
       include: { items: true },
     });
 
     if (!originalSale) throw new NotFoundException(`Sale ${id} not found`);
     const exchangeShift = await this.prisma.shift.findUnique({ where: { id: dto.shiftId } });
-    if (!exchangeShift || exchangeShift.cashierId !== actor.userId || exchangeShift.status !== ShiftStatus.OPEN) {
+    if (!exchangeShift || (actor.storeId && exchangeShift.storeId !== actor.storeId) || exchangeShift.cashierId !== actor.userId || exchangeShift.status !== ShiftStatus.OPEN) {
       throw new BadRequestException('الوردية غير صالحة أو لا تملكها');
     }
     if (originalSale.refundStatus === RefundStatus.FULL) {
@@ -319,7 +318,7 @@ export class SalesService {
 
     // تحقق توفر مخزون الأصناف الجديدة
     const newVariantIds = dto.newItems.map((i) => i.variantId);
-    const newVariants = await this.prisma.variant.findMany({ where: { id: { in: newVariantIds } } });
+    const newVariants = await this.prisma.variant.findMany({ where: { id: { in: newVariantIds }, ...(actor.storeId ? { storeId: actor.storeId } : {}) } });
     if (newVariants.length !== newVariantIds.length) {
       throw new NotFoundException('صنف بديل غير موجود');
     }
@@ -399,6 +398,7 @@ export class SalesService {
       return tx.sale.create({
         data: {
           shiftId: dto.shiftId,
+          storeId: actor.storeId,
           userId: actor.userId,
           totalAmount: newValue,
           discount: Math.min(returnValue, newValue), // الجزء المُغطّى من قيمة الصنف المُرجَع
@@ -412,6 +412,7 @@ export class SalesService {
                 quantity: item.quantity,
                 price: resolvePrice(variant, item.priceTier as PriceTier, item.overridePrice),
                 unitCostAtSale: variant.costPrice,
+                storeId: actor.storeId,
               };
             }),
           },
@@ -428,13 +429,13 @@ export class SalesService {
       reason: dto.reason,
     });
 
-    const finalNewSale = await this.prisma.sale.findUnique({
-      where: { id: newSale.id },
+    const finalNewSale = await this.prisma.sale.findFirst({
+      where: { id: newSale.id, ...(actor.storeId ? { storeId: actor.storeId } : {}) },
       include: { items: { include: { variant: { include: { product: true } } } } },
     });
 
-    const finalOriginalSale = await this.prisma.sale.findUnique({
-      where: { id },
+    const finalOriginalSale = await this.prisma.sale.findFirst({
+      where: { id, ...(actor.storeId ? { storeId: actor.storeId } : {}) },
       include: { items: { include: { variant: { include: { product: true } } } } },
     });
 

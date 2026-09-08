@@ -4,6 +4,7 @@ import { Response } from 'express';
 import * as fs from 'fs';
 import { UserRole } from '@prisma/client';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { ReportsService } from './reports.service';
 
 @ApiTags('Reports & Analytics')
@@ -17,41 +18,41 @@ export class ReportsController {
   @ApiOperation({ summary: 'Revenue, COGS, Gross Profit, Expenses, Net Profit' })
   @ApiQuery({ name: 'from', required: false })
   @ApiQuery({ name: 'to', required: false })
-  financialSummary(@Query('from') from?: string, @Query('to') to?: string) {
-    return this.reportsService.financialSummary(from, to);
+  financialSummary(@Query('from') from: string | undefined, @Query('to') to: string | undefined, @CurrentUser() user: AuthenticatedUser) {
+    return this.reportsService.financialSummary(from, to, user.storeId);
   }
 
   @Get('top-products')
   @ApiOperation({ summary: 'المنتجات الأكثر مبيعاً' })
-  topProducts(@Query('from') from?: string, @Query('to') to?: string) {
-    return this.reportsService.topProducts(from, to);
+  topProducts(@Query('from') from: string | undefined, @Query('to') to: string | undefined, @CurrentUser() user: AuthenticatedUser) {
+    return this.reportsService.topProducts(from, to, 10, user.storeId);
   }
 
   @Get('slow-products')
   @ApiOperation({ summary: 'المنتجات الراكدة' })
-  slowProducts(@Query('from') from?: string, @Query('to') to?: string) {
-    return this.reportsService.slowMovingProducts(from, to);
+  slowProducts(@Query('from') from: string | undefined, @Query('to') to: string | undefined, @CurrentUser() user: AuthenticatedUser) {
+    return this.reportsService.slowMovingProducts(from, to, user.storeId);
   }
 
   @Get('employee-performance')
   @ApiOperation({ summary: 'أداء الموظفين' })
-  employeePerformance(@Query('from') from?: string, @Query('to') to?: string) {
-    return this.reportsService.employeePerformance(from, to);
+  employeePerformance(@Query('from') from: string | undefined, @Query('to') to: string | undefined, @CurrentUser() user: AuthenticatedUser) {
+    return this.reportsService.employeePerformance(from, to, user.storeId);
   }
 
   @Get('sales-trend')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER, UserRole.CASHIER)
   @ApiOperation({ summary: 'اتجاه المبيعات اليومي لآخر N يوم - للرسم البياني بلوحة التحكم (متاح لكل الأدوار)' })
   @ApiQuery({ name: 'days', required: false })
-  salesTrend(@Query('days') days?: string) {
+  salesTrend(@Query('days') days: string | undefined, @CurrentUser() user: AuthenticatedUser) {
     const parsed = days === undefined ? 7 : Number(days);
-    return this.reportsService.salesTrend(parsed);
+    return this.reportsService.salesTrend(parsed, user.storeId);
   }
 
   @Get('export/excel')
   @ApiOperation({ summary: 'تصدير تقرير شامل بصيغة Excel' })
-  async exportExcel(@Query('from') from: string, @Query('to') to: string, @Res() res: Response) {
-    const filePath = await this.reportsService.exportToExcel(from, to);
+  async exportExcel(@Query('from') from: string, @Query('to') to: string, @CurrentUser() user: AuthenticatedUser, @Res() res: Response) {
+    const filePath = await this.reportsService.exportToExcel(from, to, user.storeId);
     res.download(filePath, 'ORANGE_Report.xlsx', (err) => {
       if (!err) fs.unlink(filePath, () => {});
     });

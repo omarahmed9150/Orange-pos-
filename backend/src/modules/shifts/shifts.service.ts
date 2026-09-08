@@ -24,9 +24,9 @@ export interface ShiftSummary {
 export class ShiftsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async open(cashierId: string, dto: OpenShiftDto) {
+  async open(cashierId: string, dto: OpenShiftDto, storeId: string) {
     const existingOpen = await this.prisma.shift.findFirst({
-      where: { cashierId, status: ShiftStatus.OPEN },
+      where: { cashierId, storeId, status: ShiftStatus.OPEN },
     });
 
     if (existingOpen) {
@@ -36,6 +36,7 @@ export class ShiftsService {
     return this.prisma.shift.create({
       data: {
         cashierId,
+        storeId,
         initialCash: dto.initialCash,
         notes: dto.notes,
         status: ShiftStatus.OPEN,
@@ -43,9 +44,9 @@ export class ShiftsService {
     });
   }
 
-  async getSummary(shiftId: string, requester?: { userId: string; role: UserRole }): Promise<ShiftSummary> {
+  async getSummary(shiftId: string, requester?: { userId: string; role: UserRole; storeId?: string }): Promise<ShiftSummary> {
     const shift = await this.prisma.shift.findUnique({
-      where: { id: shiftId },
+      where: { id: shiftId, ...(requester?.storeId ? { storeId: requester.storeId } : {}) },
       include: { sales: true, expenses: true },
     });
 
@@ -88,9 +89,9 @@ export class ShiftsService {
     };
   }
 
-  async close(shiftId: string, dto: CloseShiftDto, requester?: { userId: string; role: UserRole }) {
+  async close(shiftId: string, dto: CloseShiftDto, requester?: { userId: string; role: UserRole; storeId?: string }) {
     const shift = await this.prisma.shift.findUnique({
-      where: { id: shiftId },
+      where: { id: shiftId, ...(requester?.storeId ? { storeId: requester.storeId } : {}) },
       include: { sales: true },
     });
 
@@ -119,9 +120,9 @@ export class ShiftsService {
     });
   }
 
-  findOpenByCashier(cashierId: string) {
+  findOpenByCashier(cashierId: string, storeId: string) {
     return this.prisma.shift.findFirst({
-      where: { cashierId, status: ShiftStatus.OPEN },
+      where: { cashierId, storeId, status: ShiftStatus.OPEN },
       include: { sales: true },
     });
   }

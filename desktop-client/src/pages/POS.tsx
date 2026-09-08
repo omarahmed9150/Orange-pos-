@@ -232,13 +232,18 @@ export function POS() {
   }
 
   async function checkout() {
-    if (!shiftId) { setMessage('لا توجد وردية مفتوحة. افتح وردية أولاً.'); return; }
     if (!cart.length) return;
     if (payment === 'DEBT' && !customerId) { setMessage('اختر العميل أولاً لتسجيل البيع بالدين'); return; }
 
     try {
+      let activeShiftId = shiftId;
+      if (!activeShiftId) {
+        const { data: openedShift } = await api.post('/shifts/open', { initialCash: 0 });
+        activeShiftId = openedShift.id;
+        setShiftId(activeShiftId);
+      }
       const { data: sale } = await api.post('/sales', {
-        shiftId,
+        shiftId: activeShiftId,
         items: cart.map((l) => ({
           variantId: l.variant.id,
           quantity: l.quantity,
@@ -348,6 +353,7 @@ export function POS() {
           <div className="bg-white rounded-xl shadow divide-y max-h-52 overflow-y-auto">
             {results.map((v) => (
               <button
+                type="button"
                 key={v.id}
                 onClick={() => addToCart(v)}
                 className="w-full text-right px-4 py-2 hover:bg-orange-light flex items-center justify-between text-sm gap-2"
@@ -366,8 +372,8 @@ export function POS() {
           <div className="bg-white rounded-xl shadow divide-y max-h-52 overflow-y-auto">
             {availableVariants.map((v) => (
               <button
-                key={v.id}
                 type="button"
+                key={v.id}
                 onClick={() => addToCart(v)}
                 className="w-full text-right px-4 py-2 hover:bg-orange-light flex items-center justify-between text-sm gap-2"
               >

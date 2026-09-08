@@ -26,25 +26,25 @@ export class CustomersController {
   @Get('search')
   @ApiOperation({ summary: 'بحث بالاسم مع تنبيه فوري إن كان للعميل دين متأخر 30 يوماً' })
   @ApiQuery({ name: 'q', required: true })
-  search(@Query('q') q: string) {
-    return this.customersService.search(q || '');
+  search(@Query('q') q: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.customersService.search(q || '', user.storeId);
   }
 
   @Get('alerts/overdue-debt')
   @ApiOperation({ summary: 'كل العملاء الذين لديهم دين متأخر 30 يوماً فأكثر' })
-  getOverdueDebtAlerts() {
-    return this.customersService.getOverdueDebtAlerts();
+  getOverdueDebtAlerts(@CurrentUser() user: AuthenticatedUser) {
+    return this.customersService.getOverdueDebtAlerts(user.storeId);
   }
 
   @Get(':id/statement')
   @ApiOperation({ summary: 'كشف حساب العميل (فواتير الدين، الدفعات، المتبقي)' })
-  getStatement(@Param('id') id: string) {
-    return this.customersService.getStatement(id);
+  getStatement(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.customersService.getStatement(id, user.storeId);
   }
 
   @Post(':id/payments')
   @ApiOperation({ summary: 'تسجيل دفعة تسديد من العميل' })
   addPayment(@Param('id') id: string, @Body() dto: CreateCustomerPaymentDto, @CurrentUser() user: AuthenticatedUser) {
-    return this.customersService.addPayment(id, dto, user.userId);
+    return this.customersService.addPayment(id, dto, user.userId, user.storeId);
   }
 }

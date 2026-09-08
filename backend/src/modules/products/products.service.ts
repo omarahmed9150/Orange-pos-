@@ -33,7 +33,7 @@ export class ProductsService {
     private readonly audit: AuditService,
   ) {}
 
-  create(dto: CreateProductDto, storeId = 'default-store') {
+  create(dto: CreateProductDto, storeId: string) {
     return this.prisma.product.create({
       data: {
         storeId,
@@ -54,8 +54,8 @@ export class ProductsService {
     });
   }
 
-  async updateImage(id: string, imageUrl: string | null) {
-    const product = await this.prisma.product.findUnique({ where: { id } });
+  async updateImage(id: string, imageUrl: string | null, storeId: string) {
+    const product = await this.prisma.product.findFirst({ where: { id, storeId } });
     if (!product) throw new NotFoundException(`Product ${id} not found`);
 
     return this.prisma.product.update({
@@ -65,13 +65,13 @@ export class ProductsService {
     });
   }
 
-  async quickUpdateVariant(variantId: string, dto: QuickUpdateVariantDto, userId: string) {
+  async quickUpdateVariant(variantId: string, dto: QuickUpdateVariantDto, userId: string, storeId: string) {
     if (dto.sellingPrice === undefined && dto.stockQuantity === undefined) {
       throw new NotFoundException('لم يتم إرسال أي قيمة للتعديل');
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
-      const variant = await tx.variant.findUnique({ where: { id: variantId } });
+      const variant = await tx.variant.findFirst({ where: { id: variantId, storeId } });
       if (!variant) throw new NotFoundException(`Variant ${variantId} not found`);
 
       const data: { sellingPrice?: number; stockQuantity?: number } = {};
@@ -106,7 +106,7 @@ export class ProductsService {
     return result;
   }
 
-  findAll(storeId = 'default-store') {
+  findAll(storeId: string) {
     return this.prisma.product.findMany({
       where: { storeId },
       include: { variants: true },
@@ -114,7 +114,7 @@ export class ProductsService {
     });
   }
 
-  search(query: string, storeId = 'default-store') {
+  search(query: string, storeId: string) {
     const term = query.trim();
     if (!term) {
       return this.findAll(storeId);
@@ -145,7 +145,7 @@ export class ProductsService {
     });
   }
 
-  async findOne(id: string, storeId = 'default-store') {
+  async findOne(id: string, storeId: string) {
     const product = await this.prisma.product.findUnique({
       where: { id, storeId },
       include: { variants: true },
@@ -158,7 +158,7 @@ export class ProductsService {
     return product;
   }
 
-  async findByBarcode(barcode: string, storeId = 'default-store') {
+  async findByBarcode(barcode: string, storeId: string) {
     const variant = await this.prisma.variant.findFirst({
       where: { barcode, storeId },
       include: { product: true },
@@ -171,7 +171,7 @@ export class ProductsService {
     return variant;
   }
 
-  async findBySku(sku: string, storeId = 'default-store') {
+  async findBySku(sku: string, storeId: string) {
     const variant = await this.prisma.variant.findFirst({
       where: { sku, storeId },
       include: { product: true },
@@ -218,7 +218,7 @@ export class ProductsService {
    * استيراد جماعي من ملف Excel (.xlsx) - يجمع الصفوف بنفس الاسم+الفئة تحت منتج واحد بعدة أصناف (Variants).
    * يتخطى أي صف SKU مكرر موجود أصلاً بقاعدة البيانات، ويجمع كل الأخطاء بدل التوقف عند أول خطأ.
    */
-  async importFromExcel(buffer: Buffer, userId: string, storeId = 'default-store') {
+  async importFromExcel(buffer: Buffer, userId: string, storeId: string) {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(buffer as any);
     const sheet = workbook.worksheets[0];

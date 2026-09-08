@@ -8,6 +8,7 @@ import { LoginDto } from './dto/login.dto';
 import { SetPinDto } from './dto/set-pin.dto';
 import { VerifyPinDto } from './dto/verify-pin.dto';
 import { QuickSwitchDto } from './dto/quick-switch.dto';
+import { RegisterDto } from './dto/register.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -20,6 +21,14 @@ export class AuthController {
   @ApiOperation({ summary: 'تسجيل الدخول (حصرياً بحساب أنشأه Super Admin)' })
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Post('register')
+  @ApiOperation({ summary: 'إنشاء حساب مستخدم ومتجر مستقل' })
+  register(@Body() dto: RegisterDto) {
+    return this.authService.register(dto);
   }
 
   @Post('set-pin')

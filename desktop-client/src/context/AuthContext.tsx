@@ -13,6 +13,7 @@ export interface AuthUser {
 interface AuthContextValue {
   user: AuthUser | null;
   login: (username: string, password: string) => Promise<void>;
+  register: (username: string, password: string, storeName: string) => Promise<void>;
   logout: () => void;
   hasRole: (...roles: UserRole[]) => boolean;
   locked: boolean;
@@ -31,6 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [locked, setLocked] = useState(false);
 
   async function login(username: string, password: string) {
+    localStorage.clear();
     const { data } = await api.post('/auth/login', { username, password });
     localStorage.setItem('orange_token', data.accessToken);
     localStorage.setItem('orange_user', JSON.stringify(data.user));
@@ -38,9 +40,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLocked(false);
   }
 
+  async function register(username: string, password: string, storeName: string) {
+    localStorage.clear();
+    const { data } = await api.post('/auth/register', { username, password, storeName });
+    localStorage.setItem('orange_token', data.accessToken);
+    localStorage.setItem('orange_user', JSON.stringify(data.user));
+    setUser(data.user);
+    setLocked(false);
+  }
+
   function logout() {
-    localStorage.removeItem('orange_token');
-    localStorage.removeItem('orange_user');
+    localStorage.clear();
     setUser(null);
     setLocked(false);
   }
@@ -70,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, hasRole, locked, lock, unlockWithPin, quickSwitchUser }}>
+    <AuthContext.Provider value={{ user, login, register, logout, hasRole, locked, lock, unlockWithPin, quickSwitchUser }}>
       {children}
     </AuthContext.Provider>
   );

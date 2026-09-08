@@ -1,11 +1,14 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { UserRole } from '@prisma/client';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { SetPinDto } from './dto/set-pin.dto';
 import { VerifyPinDto } from './dto/verify-pin.dto';
 import { QuickSwitchDto } from './dto/quick-switch.dto';
+import { RegisterDto } from './dto/register.dto';
 
 @Injectable()
 export class AuthService {
@@ -32,6 +35,51 @@ export class AuthService {
 
     return {
       accessToken,
+      user: {
+        id: user.id,
+        username: user.username,
+        fullName: user.fullName,
+        role: user.role,
+        storeId: user.storeId,
+      },
+    };
+  }
+
+  async register(dto: RegisterDto) {
+    const username = dto.username.trim();
+    const storeName = dto.storeName.trim();
+    if (!username || !storeName) {
+      throw new BadRequestException('يرجى إدخال اسم المستخدم واسم المنشأة');
+    }
+
+    const existingUser = await this.prisma.user.findUnique({ where: { username } });
+    if (existingUser) {
+      throw new BadRequestException('اسم المستخدم مستخدم مسبقاً');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, 12);
+    const storeId = randomUUID();
+    const user = await this.prisma.$transaction(async (tx) => {
+      await tx.store.create({ data: { id: storeId, name: storeName } });
+      return tx.user.create({
+        data: {
+          username,
+          fullName: storeName,
+          passwordHash,
+          role: UserRole.SUPER_ADMIN,
+          storeId,
+          isActive: true,
+        },
+      });
+    });
+
+    return {
+      accessToken: await this.jwt.signAsync({
+        sub: user.id,
+        username: user.username,
+        role: user.role,
+        storeId: user.storeId,
+      }),
       user: {
         id: user.id,
         username: user.username,

@@ -23,26 +23,26 @@ export class SalesController {
   @Get('shift/:shiftId')
   @ApiOperation({ summary: 'List sales for a shift (معزولة حسب المستخدم للكاشير)' })
   findByShift(@Param('shiftId') shiftId: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.salesService.findByShift(shiftId, { userId: user.userId, role: user.role as UserRole });
+    return this.salesService.findByShift(shiftId, { userId: user.userId, role: user.role as UserRole, storeId: user.storeId });
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get sale by ID' })
   findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.salesService.findOne(id, { userId: user.userId, role: user.role as UserRole });
+    return this.salesService.findOne(id, { userId: user.userId, role: user.role as UserRole, storeId: user.storeId });
   }
 
   @Post(':id/refund')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: '🔄 استرجاع فاتورة (كامل أو جزئي)' })
   refund(@Param('id') id: string, @Body() dto: RefundSaleDto, @CurrentUser() user: AuthenticatedUser) {
-    return this.salesService.refund(id, dto, { userId: user.userId, username: user.username });
+    return this.salesService.refund(id, dto, { userId: user.userId, username: user.username, storeId: user.storeId });
   }
 
   @Post(':id/exchange')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: '↔️ استبدال منتج بآخر مع حساب فرق السعر تلقائياً' })
   exchange(@Param('id') id: string, @Body() dto: ExchangeSaleDto, @CurrentUser() user: AuthenticatedUser) {
-    return this.salesService.exchange(id, dto, { userId: user.userId, username: user.username });
+    return this.salesService.exchange(id, dto, { userId: user.userId, username: user.username, storeId: user.storeId });
   }
 }
