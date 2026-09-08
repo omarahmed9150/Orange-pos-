@@ -43,7 +43,7 @@ export function initAutoUpdater(mainWindow: BrowserWindow) {
 
   ipcMain.handle('check-for-updates', () => autoUpdater.checkForUpdates());
 
-  autoUpdater.checkForUpdates().catch(() => {
+  autoUpdater.checkForUpdatesAndNotify().catch(() => {
     // بدون اتصال إنترنت أو رابط تحديث غير مضبوط بعد - يُتجاهل بصمت
   });
 }

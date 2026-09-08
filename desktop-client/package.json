@@ -42,6 +42,11 @@
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
       "uninstallDisplayName": "ORANGE POS"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "omarahmed9150",
+      "repo": "Orange-pos-"
     }
   },
   "dependencies": {

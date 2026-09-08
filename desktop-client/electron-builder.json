@@ -17,8 +17,8 @@
   ],
   "publish": {
     "provider": "github",
-    "owner": "REPLACE_WITH_YOUR_GITHUB_USERNAME",
-    "repo": "REPLACE_WITH_YOUR_REPO_NAME"
+    "owner": "omarahmed9150",
+    "repo": "Orange-pos-"
   },
   "win": {
     "icon": "build/icon.ico",
