@@ -33,7 +33,9 @@ export const SetupPage: React.FC<SetupPageProps> = ({ onSetupComplete }) => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:3000/api/setup-admin', {
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://backend-nine-swart-94.vercel.app';
+      const apiBaseUrl = apiUrl.endsWith('/api') ? apiUrl : `${apiUrl}/api`;
+      const response = await fetch(`${apiBaseUrl}/setup-admin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: username.trim(), password }),
