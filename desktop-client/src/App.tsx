@@ -28,7 +28,8 @@ export default function App() {
   useEffect(() => {
     const checkSetupStatus = async () => {
       try {
-        const apiBaseUrl = import.meta.env.VITE_API_URL || '/api';
+        const API_URL = import.meta.env.VITE_API_URL || 'https://backend-nine-swart-94.vercel.app';
+        const apiBaseUrl = API_URL.endsWith('/api') ? API_URL : `${API_URL}/api`;
         const response = await fetch(`${apiBaseUrl}/check-setup`);
         if (!response.ok) {
           throw new Error(`Backend returned HTTP ${response.status}`);

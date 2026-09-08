@@ -1,9 +1,10 @@
 import axios from 'axios';
 
 const isFileProtocol = window.location.protocol === 'file:';
+const API_URL = import.meta.env.VITE_API_URL || 'https://backend-nine-swart-94.vercel.app';
 const apiBaseUrl = isFileProtocol
   ? 'http://127.0.0.1:3000/api'
-  : (import.meta.env.VITE_API_URL || '/api');
+  : (API_URL.endsWith('/api') ? API_URL : `${API_URL}/api`);
 
 export const api = axios.create({
   baseURL: apiBaseUrl,
