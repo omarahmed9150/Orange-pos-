@@ -17,6 +17,7 @@ interface Variant {
   wholesalePrice: number | null;
   vipPrice: number | null;
   stockQuantity: number;
+  expiryDate: string | null;
   product: { name: string; category?: string; imageUrl?: string | null };
 }
 
@@ -194,6 +195,11 @@ export function POS() {
   }
 
   function addToCart(variant: Variant, opts?: { overridePrice?: number }) {
+    if (variant.expiryDate && new Date(variant.expiryDate) < new Date()) {
+      setMessage('لا يمكن بيع هذا الصنف لأنه منتهي الصلاحية');
+      setResults([]);
+      return;
+    }
     setResults([]);
     setCart((prev) => {
       if (!opts?.overridePrice) {
@@ -235,6 +241,7 @@ export function POS() {
     (selectedCategory === 'ALL' || v.product.category === selectedCategory) &&
     (showOutOfStock || v.stockQuantity > 0),
   );
+  const isExpired = (v: Variant) => Boolean(v.expiryDate && new Date(v.expiryDate) < new Date());
 
   async function searchCustomers(q: string) {
     setCustomerSearch(q);
@@ -381,7 +388,8 @@ export function POS() {
                 type="button"
                 key={v.id}
                 onClick={() => addToCart(v)}
-                className="w-full text-right px-4 py-2 hover:bg-orange-light flex items-center justify-between text-sm gap-2"
+                disabled={isExpired(v)}
+                className={`w-full text-right px-4 py-2 flex items-center justify-between text-sm gap-2 ${isExpired(v) ? 'bg-red-50 text-red-700 cursor-not-allowed' : 'hover:bg-orange-light'}`}
               >
                 <span className="flex items-center gap-2">
                   {v.product.imageUrl && <img src={v.product.imageUrl} className="w-8 h-8 object-cover rounded" />}
@@ -410,10 +418,11 @@ export function POS() {
                 type="button"
                 key={v.id}
                 onClick={() => addToCart(v)}
-                className="text-right bg-white rounded-xl shadow-sm hover:shadow-md hover:border-orange border border-transparent p-3 transition flex flex-col gap-2"
+                className={`text-right rounded-xl shadow-sm border p-3 transition flex flex-col gap-2 ${isExpired(v) ? 'bg-red-50 border-red-500 text-red-800' : 'bg-white border-transparent hover:shadow-md hover:border-orange'}`}
               >
                 {v.product.imageUrl ? <img src={v.product.imageUrl} className="w-full h-24 object-cover rounded-lg" /> : <div className="w-full h-24 rounded-lg bg-orange-light flex items-center justify-center text-2xl">🛒</div>}
                 <span className="font-semibold">{variantLabel(v)}</span>
+                {isExpired(v) && <span className="text-xs font-bold text-red-700 border border-red-500 rounded px-2 py-1 w-fit">منتهي الصلاحية</span>}
                 <span className="text-xs text-gray-500">المتوفر: {v.stockQuantity}</span>
                 <span className="font-bold text-orange">{v.sellingPrice.toFixed(2)}</span>
               </button>

@@ -19,7 +19,7 @@ export class TelegramController {
   @Delete('link')
   @ApiOperation({ summary: 'إلغاء ربط حساب تليغرام للمستخدم الحالي' })
   async unlink(@CurrentUser() user: AuthenticatedUser) {
-    await this.telegram.unlink(user.userId);
+    await this.telegram.unlink(user.userId, user.storeId);
     return { message: 'تم إلغاء الربط' };
   }
 

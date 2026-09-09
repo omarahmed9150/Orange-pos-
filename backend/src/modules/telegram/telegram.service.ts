@@ -2,13 +2,17 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as crypto from 'crypto';
 import TelegramBot = require('node-telegram-bot-api');
 import { PrismaService } from '../../prisma/prisma.service';
+import { StoreSettingsService } from '../store-settings/store-settings.service';
 
 @Injectable()
 export class TelegramService implements OnModuleInit {
   private readonly logger = new Logger(TelegramService.name);
   private bot: TelegramBot | null = null;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storeSettings: StoreSettingsService,
+  ) {}
 
   onModuleInit() {
     const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -35,9 +39,10 @@ export class TelegramService implements OnModuleInit {
         return;
       }
 
+      await this.storeSettings.setTelegramChatId(user.storeId, chatId);
       await this.prisma.user.update({
         where: { id: user.id },
-        data: { telegramChatId: chatId, telegramLinkToken: null },
+        data: { telegramLinkToken: null },
       });
 
       await this.bot!.sendMessage(
@@ -54,13 +59,14 @@ export class TelegramService implements OnModuleInit {
     const token = crypto.randomBytes(16).toString('hex');
     await this.prisma.user.update({ where: { id: userId }, data: { telegramLinkToken: token } });
 
-    const botUsername = process.env.TELEGRAM_BOT_USERNAME;
-    const link = botUsername ? `tg://resolve?domain=${encodeURIComponent(botUsername)}&start=${encodeURIComponent(token)}` : null;
+    const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'Orange_2bot';
+    const link = `https://t.me/${encodeURIComponent(botUsername)}?start=${encodeURIComponent(token)}`;
 
     return { token, link };
   }
 
-  async unlink(userId: string) {
+  async unlink(userId: string, storeId: string) {
+    await this.storeSettings.setTelegramChatId(storeId, null);
     await this.prisma.user.update({ where: { id: userId }, data: { telegramChatId: null } });
   }
 

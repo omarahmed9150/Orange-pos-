@@ -5,6 +5,10 @@ import { UpdateStoreSettingsDto } from './dto/update-settings.dto';
 
 const SINGLETON_ID = 'singleton';
 
+function settingsId(storeId: string) {
+  return storeId === 'default-store' ? SINGLETON_ID : `${storeId}:settings`;
+}
+
 @Injectable()
 export class StoreSettingsService {
   constructor(
@@ -14,9 +18,9 @@ export class StoreSettingsService {
 
   /** يرجّع الإعدادات، وينشئ صف افتراضي عند أول استخدام إن لم يوجد */
   async get(storeId = 'default-store') {
-    const existing = await this.prisma.storeSettings.findFirst({ where: { id: SINGLETON_ID, storeId } });
+    const existing = await this.prisma.storeSettings.findFirst({ where: { storeId } });
     if (existing) return existing;
-    return this.prisma.storeSettings.create({ data: { id: SINGLETON_ID, storeId } });
+    return this.prisma.storeSettings.create({ data: { id: settingsId(storeId), storeId } });
   }
 
   async update(dto: UpdateStoreSettingsDto, userId: string) {
@@ -24,7 +28,7 @@ export class StoreSettingsService {
     const storeId = actor?.storeId ?? 'default-store';
     await this.get(storeId); // يضمن وجود الصف أولاً
     const updated = await this.prisma.storeSettings.update({
-      where: { id: SINGLETON_ID },
+      where: { id: settingsId(storeId) },
       data: dto,
     });
     await this.audit.log(userId, 'STORE_SETTINGS_UPDATED', 'StoreSettings', SINGLETON_ID, dto);
@@ -37,6 +41,14 @@ export class StoreSettingsService {
     return this.prisma.storeSettings.update({
       where: { id: SINGLETON_ID },
       data: { licenseKey, licenseActivatedAt: new Date() },
+    });
+  }
+
+  async setTelegramChatId(storeId: string, telegramChatId: string | null) {
+    await this.get(storeId);
+    return this.prisma.storeSettings.update({
+      where: { id: settingsId(storeId) },
+      data: { telegramChatId },
     });
   }
 }

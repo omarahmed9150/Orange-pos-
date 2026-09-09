@@ -24,15 +24,16 @@ export class BackupService {
       return;
     }
 
-    const users = await this.prisma.user.findMany({
-      where: { isActive: true, telegramChatId: { not: null } },
+    const stores = await this.prisma.storeSettings.findMany({
+      where: { telegramChatId: { not: null } },
     });
 
-    for (const user of users) {
+    for (const store of stores) {
       try {
-        await this.backupForUser(user.id, user.telegramChatId!, user.fullName, user.storeId);
+        const owner = await this.prisma.user.findFirst({ where: { storeId: store.storeId, isActive: true }, orderBy: { createdAt: 'asc' } });
+        if (owner) await this.backupForUser(owner.id, store.telegramChatId!, owner.fullName, store.storeId);
       } catch (err) {
-        this.logger.error(`فشل النسخ الاحتياطي للمستخدم ${user.username}: ${err}`);
+        this.logger.error(`فشل النسخ الاحتياطي للمتجر ${store.storeId}: ${err}`);
       }
     }
   }
