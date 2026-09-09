@@ -6,7 +6,10 @@ import { AuthProvider } from './context/AuthContext';
 import { I18nProvider } from './context/I18nContext';
 import { ProductCacheProvider } from './context/ProductCacheContext';
 import { LicenseGate } from './components/LicenseGate';
+import { clearStorageIfTokenHasInvalidStore } from './lib/auth-storage';
 import './index.css';
+
+clearStorageIfTokenHasInvalidStore();
 
 if (import.meta.env.PROD && (window.location.protocol === 'http:' || window.location.protocol === 'https:') && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {

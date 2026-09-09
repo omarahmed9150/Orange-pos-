@@ -8,6 +8,30 @@ export function validStoreId(value: unknown): value is string {
   return typeof value === 'string' && value.trim() !== '' && value !== 'null' && value !== 'undefined';
 }
 
+function readTokenStoreId(token: string): unknown {
+  const payload = token.split('.')[1];
+  if (!payload) {
+    throw new Error('التوكن المخزن ليس JWT صالحاً');
+  }
+
+  const normalizedPayload = payload.replace(/-/g, '+').replace(/_/g, '/');
+  const paddedPayload = normalizedPayload.padEnd(Math.ceil(normalizedPayload.length / 4) * 4, '=');
+  return (JSON.parse(atob(paddedPayload)) as { storeId?: unknown }).storeId;
+}
+
+export function clearStorageIfTokenHasInvalidStore(): void {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) return;
+
+  try {
+    if (!validStoreId(readTokenStoreId(token))) {
+      localStorage.clear();
+    }
+  } catch {
+    localStorage.clear();
+  }
+}
+
 export function saveAuthSession(token: string, user: AuthUser) {
   if (!validStoreId(user.storeId)) {
     localStorage.removeItem(TOKEN_KEY);

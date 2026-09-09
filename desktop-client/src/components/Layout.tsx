@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
 import { LockScreen } from './LockScreen';
 import { UpdateBanner } from './UpdateBanner';
+import { APP_BUILD_DATE, APP_VERSION } from '../lib/version';
 
 const navItems = [
   { to: '/', icon: '📊', key: 'dashboard', roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'CASHIER'] },
@@ -76,6 +77,9 @@ export function Layout() {
               {t('logout')}
             </button>
           </div>
+          <p className="mt-3 text-center text-[10px] text-gray-400" dir="ltr">
+            Build v{APP_VERSION} - Fix Store | {APP_BUILD_DATE}
+          </p>
         </div>
       </aside>
 

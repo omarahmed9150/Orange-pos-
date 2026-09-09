@@ -1,6 +1,6 @@
 {
   "installCommand": "npm install --include=dev --production=false",
-  "buildCommand": "npx vite build",
+  "buildCommand": "npm run build:web",
   "outputDirectory": "dist",
   "env": {
     "NPM_CONFIG_PRODUCTION": "false"

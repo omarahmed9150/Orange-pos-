@@ -1,4 +1,4 @@
-const CACHE_NAME = 'orange-pos-v1';
+const CACHE_NAME = 'orange-pos-v1.0.5';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(self.skipWaiting());
