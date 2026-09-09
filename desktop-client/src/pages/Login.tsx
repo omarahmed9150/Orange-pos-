@@ -4,13 +4,11 @@ import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
 
 export function Login() {
-  const { login, register } = useAuth();
+  const { login } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [storeName, setStoreName] = useState('');
-  const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -19,11 +17,7 @@ export function Login() {
     setError('');
     setLoading(true);
     try {
-      if (isRegistering) {
-        await register(username, password, storeName);
-      } else {
-        await login(username, password);
-      }
+      await login(username, password);
       navigate('/');
     } catch (err: any) {
       if (err?.response?.status === 429) {
@@ -42,7 +36,7 @@ export function Login() {
         <div className="text-center mb-4">
           <h1 className="text-3xl font-bold text-orange">ORANGE</h1>
           <p className="text-gray-500 text-sm">
-            {isRegistering ? 'إنشاء حساب متجر مستقل' : 'نظام إدارة نقاط البيع'}
+            نظام إدارة نقاط البيع
           </p>
         </div>
 
@@ -56,18 +50,6 @@ export function Login() {
             required
           />
         </div>
-
-        {isRegistering && (
-          <div>
-            <label className="block text-sm font-medium mb-1">اسم المنشأة / المتجر</label>
-            <input
-              className="w-full border rounded-lg px-3 py-2 focus:outline-orange"
-              value={storeName}
-              onChange={(e) => setStoreName(e.target.value)}
-              required
-            />
-          </div>
-        )}
 
         <div>
           <label className="block text-sm font-medium mb-1">{t('password')}</label>
@@ -87,18 +69,7 @@ export function Login() {
           disabled={loading}
           className="w-full bg-orange hover:bg-orange-dark text-white rounded-lg py-2 font-semibold disabled:opacity-50"
         >
-          {loading ? '...' : isRegistering ? 'إنشاء الحساب' : t('login')}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setIsRegistering((value) => !value);
-            setError('');
-          }}
-          className="w-full text-sm text-orange hover:text-orange-dark"
-        >
-          {isRegistering ? 'لديك حساب؟ تسجيل الدخول' : 'ليس لديك حساب؟ إنشاء حساب جديد'}
+          {loading ? '...' : t('login')}
         </button>
       </form>
     </div>

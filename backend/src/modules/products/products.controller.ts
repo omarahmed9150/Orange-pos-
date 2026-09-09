@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -20,6 +21,7 @@ import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductImageDto } from './dto/update-image.dto';
 import { QuickUpdateVariantDto } from './dto/quick-update-variant.dto';
+import { UpdateProductDto } from './dto/update-product.dto';
 
 @ApiTags('Products')
 @ApiBearerAuth()
@@ -90,6 +92,20 @@ export class ProductsController {
   @ApiOperation({ summary: 'Get product by ID' })
   findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.productsService.findOne(id, user.storeId);
+  }
+
+  @Patch(':id')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: 'تعديل المنتج والصنف الأساسي' })
+  update(@Param('id') id: string, @Body() dto: UpdateProductDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.productsService.update(id, dto, user.userId, user.storeId);
+  }
+
+  @Delete(':id')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @ApiOperation({ summary: 'حذف المنتج نهائياً مع أصنافه' })
+  remove(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.productsService.remove(id, user.userId, user.storeId);
   }
 
   @Patch(':id/image')

@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { API_BASE_URL } from '../lib/api';
 import { useProductCache } from '../context/ProductCacheContext';
@@ -40,6 +40,8 @@ export function Products() {
   const [importing, setImporting] = useState(false);
   const [generatingBarcode, setGeneratingBarcode] = useState(false);
   const [generatedBarcode, setGeneratedBarcode] = useState('');
+  const [search, setSearch] = useState('');
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   function onImageUpload(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -62,7 +64,7 @@ export function Products() {
     e.preventDefault();
     setError('');
     try {
-      await api.post('/products', {
+      const payload = {
         name,
         category,
         imageUrl: imageUrl || undefined,
@@ -77,17 +79,71 @@ export function Products() {
             expiryDate: expiryDate || undefined,
           },
         ],
-      });
+      };
+      if (editingProduct) {
+        await api.patch(`/products/${editingProduct.id}`, {
+          name,
+          category,
+          imageUrl: imageUrl || undefined,
+          barcode: barcode || undefined,
+          costPrice: Number(costPrice),
+          sellingPrice: Number(sellingPrice),
+          wholesalePrice: wholesalePrice ? Number(wholesalePrice) : undefined,
+          vipPrice: vipPrice ? Number(vipPrice) : undefined,
+          stockQuantity: Number(stock) || 0,
+        });
+      } else {
+        await api.post('/products', payload);
+      }
       setShowForm(false);
+      setEditingProduct(null);
       setName(''); setCategory(''); setBarcode('');
       setCostPrice(''); setSellingPrice(''); setWholesalePrice(''); setVipPrice(''); setStock(''); setExpiryDate(''); setImageUrl('');
       queryClient.invalidateQueries({ queryKey: ['products'] });
       window.electron?.ipcRenderer?.send('product-updated');
       load();
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'تعذر إضافة المنتج');
+      setError(err?.response?.data?.message || (editingProduct ? 'تعذر تعديل المنتج' : 'تعذر إضافة المنتج'));
     }
   }
+
+  function editProduct(product: Product) {
+    const variant = product.variants[0];
+    if (!variant) return;
+    setEditingProduct(product);
+    setName(product.name);
+    setCategory(product.category);
+    setImageUrl(product.imageUrl || '');
+    setBarcode(variant.barcode || '');
+    setCostPrice(String(variant.costPrice));
+    setSellingPrice(String(variant.sellingPrice));
+    setWholesalePrice('');
+    setVipPrice('');
+    setStock(String(variant.stockQuantity));
+    setShowForm(true);
+  }
+
+  async function deleteProduct(product: Product) {
+    if (!window.confirm(`هل أنت متأكد من حذف "${product.name}" نهائياً؟`)) return;
+    try {
+      await api.delete(`/products/${product.id}`);
+      setProducts((current) => current.filter((item) => item.id !== product.id));
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      window.electron?.ipcRenderer?.send('product-updated');
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'تعذر حذف المنتج');
+    }
+  }
+
+  const visibleProducts = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return products;
+    return products.filter((product) =>
+      `${product.name} ${product.category} ${product.variants.map((variant) => variant.barcode || '').join(' ')}`
+        .toLowerCase()
+        .includes(term),
+    );
+  }, [products, search]);
 
   async function downloadTemplate() {
     const token = localStorage.getItem('orange_token');
@@ -143,9 +199,19 @@ export function Products() {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">المنتجات</h1>
-        <button onClick={() => setShowForm(!showForm)} className="bg-orange text-white rounded-lg px-4 py-2 font-semibold">
+        <button onClick={() => { setEditingProduct(null); setShowForm(!showForm); }} className="bg-orange text-white rounded-lg px-4 py-2 font-semibold">
           {showForm ? 'إلغاء' : '+ منتج جديد'}
         </button>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow p-4">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="ابحث باسم المنتج أو الفئة أو امسح الباركود..."
+          autoFocus
+          className="w-full border rounded-lg px-4 py-3"
+        />
       </div>
 
       <div className="bg-white rounded-2xl shadow p-5 space-y-3">
@@ -216,16 +282,23 @@ export function Products() {
             <input type="file" accept="image/*" onChange={onImageUpload} />
             {imageUrl && <img src={imageUrl} className="h-16 mt-2 rounded-lg" />}
           </div>
-          <button className="col-span-3 bg-orange text-white rounded-lg py-2 font-semibold">حفظ المنتج</button>
+          <p className="col-span-3 bg-orange-light text-orange-dark rounded-lg px-3 py-2 font-semibold">
+            الربح التقديري: {sellingPrice && costPrice ? (Number(sellingPrice) - Number(costPrice)).toFixed(2) : '0.00'}
+          </p>
+          <button className="col-span-3 bg-orange text-white rounded-lg py-2 font-semibold">{editingProduct ? 'حفظ التعديلات' : 'حفظ المنتج'}</button>
         </form>
       )}
 
       <div className="bg-white rounded-2xl shadow divide-y">
-        {products.map((p) => (
+        {visibleProducts.map((p) => (
           <div key={p.id} className="p-4 flex gap-3">
             {p.imageUrl && <img src={p.imageUrl} className="w-14 h-14 object-cover rounded-lg" />}
             <div>
-              <p className="font-bold">{p.name} <span className="text-sm text-gray-400">({p.category})</span></p>
+              <div className="flex items-center gap-2">
+                <p className="font-bold">{p.name} <span className="text-sm text-gray-400">({p.category})</span></p>
+                <button type="button" title="تعديل المنتج" onClick={() => editProduct(p)} className="text-blue-600 text-lg">✏️</button>
+                <button type="button" title="حذف نهائي" onClick={() => deleteProduct(p)} className="text-red-600 text-lg">🗑️</button>
+              </div>
               <div className="mt-2 flex flex-wrap gap-2">
                 {p.variants.map((v) => (
                   <div key={v.id} className="bg-gray-50 rounded-lg px-3 py-1.5 text-sm flex items-center gap-2">
@@ -252,7 +325,7 @@ export function Products() {
                         }
                       }}
                     >
-                      تعديل
+                      تعديل سريع
                     </button>
                     <span className="font-bold">{v.sellingPrice.toFixed(2)}</span>
                     <span className={v.stockQuantity <= v.minStockLevel ? 'text-red-500' : 'text-gray-500'}>

@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { QuickUpdateVariantDto } from './dto/quick-update-variant.dto';
+import { UpdateProductDto } from './dto/update-product.dto';
 import { StockMovementType } from '@prisma/client';
 import { randomUUID } from 'crypto';
 
@@ -63,6 +64,48 @@ export class ProductsService {
       data: { imageUrl },
       include: { variants: true },
     });
+  }
+
+  async update(id: string, dto: UpdateProductDto, userId: string, storeId: string) {
+    const product = await this.prisma.product.findFirst({
+      where: { id, storeId },
+      include: { variants: { take: 1 } },
+    });
+    if (!product || !product.variants[0]) throw new NotFoundException(`Product ${id} not found`);
+
+    const { name, category, imageUrl, barcode, costPrice, sellingPrice, wholesalePrice, vipPrice, stockQuantity } = dto;
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.product.update({
+        where: { id },
+        data: {
+          ...(name !== undefined ? { name } : {}),
+          ...(category !== undefined ? { category } : {}),
+          ...(imageUrl !== undefined ? { imageUrl } : {}),
+        },
+      });
+      return tx.variant.update({
+        where: { id: product.variants[0].id },
+        data: {
+          ...(barcode !== undefined ? { barcode } : {}),
+          ...(costPrice !== undefined ? { costPrice } : {}),
+          ...(sellingPrice !== undefined ? { sellingPrice } : {}),
+          ...(wholesalePrice !== undefined ? { wholesalePrice } : {}),
+          ...(vipPrice !== undefined ? { vipPrice } : {}),
+          ...(stockQuantity !== undefined ? { stockQuantity } : {}),
+        },
+        include: { product: true },
+      });
+    });
+    await this.audit.log(userId, 'PRODUCT_UPDATED', 'Product', id, { productId: id, variantId: updated.id });
+    return this.findOne(id, storeId);
+  }
+
+  async remove(id: string, userId: string, storeId: string) {
+    const product = await this.prisma.product.findFirst({ where: { id, storeId } });
+    if (!product) throw new NotFoundException(`Product ${id} not found`);
+    await this.prisma.product.delete({ where: { id } });
+    await this.audit.log(userId, 'PRODUCT_DELETED', 'Product', id, { name: product.name });
+    return { deleted: true };
   }
 
   async quickUpdateVariant(variantId: string, dto: QuickUpdateVariantDto, userId: string, storeId: string) {

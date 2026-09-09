@@ -17,7 +17,7 @@ interface Variant {
   wholesalePrice: number | null;
   vipPrice: number | null;
   stockQuantity: number;
-  product: { name: string; imageUrl?: string | null };
+  product: { name: string; category?: string; imageUrl?: string | null };
 }
 
 type PriceTier = 'RETAIL' | 'WHOLESALE' | 'VIP';
@@ -58,6 +58,8 @@ export function POS() {
   });
   const [results, setResults] = useState<Variant[]>([]);
   const [availableVariants, setAvailableVariants] = useState<Variant[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [showOutOfStock, setShowOutOfStock] = useState(true);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [discount, setDiscount] = useState(0);
   const [discountIsPercent, setDiscountIsPercent] = useState(false);
@@ -79,6 +81,8 @@ export function POS() {
     return raw ? JSON.parse(raw) : [];
   });
   const inputRef = useRef<HTMLInputElement>(null);
+  const scanBufferRef = useRef('');
+  const scanTimerRef = useRef<number | undefined>(undefined);
 
   async function loadAvailableProducts() {
     const { data } = await api.get('/products');
@@ -86,7 +90,7 @@ export function POS() {
       data.flatMap((product: any) =>
         product.variants.map((variant: Variant) => ({
           ...variant,
-          product: { name: product.name, imageUrl: product.imageUrl },
+          product: { name: product.name, category: product.category, imageUrl: product.imageUrl },
         })),
       ),
     );
@@ -121,6 +125,17 @@ export function POS() {
       if (e.key === 'F2') { e.preventDefault(); inputRef.current?.focus(); }
       if (e.key === 'F9') { e.preventDefault(); if (cart.length) checkout(); }
       if (e.key === 'F4') { e.preventDefault(); if (cart.length) holdOrder(); }
+      if (e.key === 'Enter' && document.activeElement !== inputRef.current && scanBufferRef.current) {
+        e.preventDefault();
+        const scannedCode = scanBufferRef.current;
+        setBarcode(scannedCode);
+        scanBufferRef.current = '';
+        void processScan(scannedCode);
+      } else if (e.key.length === 1 && /^[0-9A-Za-z]$/.test(e.key) && document.activeElement !== inputRef.current) {
+        scanBufferRef.current += e.key;
+        window.clearTimeout(scanTimerRef.current);
+        scanTimerRef.current = window.setTimeout(() => { scanBufferRef.current = ''; }, 120);
+      }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -136,8 +151,7 @@ export function POS() {
 
   const variantLabel = (v: Variant) => formatVariantLabel({ product: { name: v.product.name }, size: v.size, color: v.color });
 
-  async function onScan(e: FormEvent) {
-    const code = barcode.trim();
+  async function processScan(code = barcode.trim()) {
     if (!code) return;
 
     const scaleData = parseScaleBarcode(code);
@@ -145,13 +159,14 @@ export function POS() {
       try {
         // نبحث عن الصنف عبر أول 6 أرقام (البادئة + PLU) المطابقة لباركود مسجّل مسبقاً في المنتج
         const { data } = await api.get('/products', { params: { q: code.slice(0, 6) } });
-        const variant = data.flatMap((p: any) => p.variants.map((v: any) => ({ ...v, product: { name: p.name, imageUrl: p.imageUrl } })))[0];
+        const variant = data.flatMap((p: any) => p.variants.map((v: any) => ({ ...v, product: { name: p.name, category: p.category, imageUrl: p.imageUrl } })))[0];
         if (variant) {
           addToCart(variant, { overridePrice: Number((scaleData.weightKg * variant.sellingPrice).toFixed(2)) });
           setMessage(`تمت إضافة صنف موزون: ${scaleData.weightKg} كغ`);
         } else {
           setMessage('لم يُعثر على صنف مطابق لكود الميزان');
         }
+
       } catch {
         setMessage('لم يُعثر على صنف مطابق لكود الميزان');
       }
@@ -167,10 +182,15 @@ export function POS() {
       // لم يُعثر عليه بالباركود -> جرّب كبحث نصي (اسم/SKU)
       const { data } = await api.get('/products', { params: { q: code } });
       const variants: Variant[] = data.flatMap((p: any) =>
-        p.variants.map((v: any) => ({ ...v, product: { name: p.name, imageUrl: p.imageUrl } })),
+        p.variants.map((v: any) => ({ ...v, product: { name: p.name, category: p.category, imageUrl: p.imageUrl } })),
       );
       setResults(variants);
     }
+  }
+
+  async function onScan(e: FormEvent) {
+    e.preventDefault();
+    await processScan();
   }
 
   function addToCart(variant: Variant, opts?: { overridePrice?: number }) {
@@ -210,6 +230,11 @@ export function POS() {
   const taxableAmount = Math.max(0, subtotal - discountAmount);
   const taxAmount = settings.taxEnabled ? (taxableAmount * settings.taxRate) / 100 : 0;
   const total = taxableAmount + taxAmount;
+  const categories = Array.from(new Set(availableVariants.map((v) => v.product.category).filter(Boolean))).sort() as string[];
+  const visibleVariants = availableVariants.filter((v) =>
+    (selectedCategory === 'ALL' || v.product.category === selectedCategory) &&
+    (showOutOfStock || v.stockQuantity > 0),
+  );
 
   async function searchCustomers(q: string) {
     setCustomerSearch(q);
@@ -369,22 +394,32 @@ export function POS() {
         )}
 
         {!barcode && results.length === 0 && availableVariants.length > 0 && (
-          <div className="bg-white rounded-xl shadow divide-y max-h-52 overflow-y-auto">
-            {availableVariants.map((v) => (
+          <>
+          <div className="flex items-center gap-2 flex-wrap">
+            <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="border rounded-lg px-3 py-2 text-sm">
+              <option value="ALL">كل المواد</option>
+              {categories.map((category) => <option key={category} value={category}>{category}</option>)}
+            </select>
+            <button type="button" onClick={() => setShowOutOfStock((value) => !value)} className="border rounded-lg px-3 py-2 text-sm">
+              {showOutOfStock ? 'إخفاء المنتهي' : 'إظهار المنتهي'}
+            </button>
+          </div>
+          <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
+            {visibleVariants.map((v) => (
               <button
                 type="button"
                 key={v.id}
                 onClick={() => addToCart(v)}
-                className="w-full text-right px-4 py-2 hover:bg-orange-light flex items-center justify-between text-sm gap-2"
+                className="text-right bg-white rounded-xl shadow-sm hover:shadow-md hover:border-orange border border-transparent p-3 transition flex flex-col gap-2"
               >
-                <span className="flex items-center gap-2">
-                  {v.product.imageUrl && <img src={v.product.imageUrl} className="w-8 h-8 object-cover rounded" />}
-                  {variantLabel(v)} - متبقي {v.stockQuantity}
-                </span>
-                <span className="font-bold">{v.sellingPrice.toFixed(2)}</span>
+                {v.product.imageUrl ? <img src={v.product.imageUrl} className="w-full h-24 object-cover rounded-lg" /> : <div className="w-full h-24 rounded-lg bg-orange-light flex items-center justify-center text-2xl">🛒</div>}
+                <span className="font-semibold">{variantLabel(v)}</span>
+                <span className="text-xs text-gray-500">المتوفر: {v.stockQuantity}</span>
+                <span className="font-bold text-orange">{v.sellingPrice.toFixed(2)}</span>
               </button>
             ))}
           </div>
+          </>
         )}
 
         <div className="bg-white rounded-2xl shadow flex-1">
