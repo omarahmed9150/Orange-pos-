@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build:web": "tsc -p tsconfig.json && vite build",
-    "build": "vite build",
+    "build": "npx vite build",
     "build:electron": "npm run build:web && tsc -p electron/tsconfig.json && electron-builder --config.win.signAndEditExecutable=false",
     "electron:dev": "concurrently \"vite\" \"electron .\"",
     "electron:build": "npm run build:electron"
