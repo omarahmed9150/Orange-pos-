@@ -9,13 +9,18 @@ import { TelegramService } from './telegram.service';
 export class TelegramController {
   constructor(private readonly telegram: TelegramService) {}
 
+  @Post('webhook')
+  @ApiOperation({ summary: 'استقبال تحديثات التليجرام عبر Webhook' })
+  async handleWebhook(@Body() update: any) {
+    await this.telegram.handleWebhook(update);
+    return { ok: true };
+  }
+
   @Post('link-token')
   @ApiOperation({ summary: 'توليد رابط ربط تليغرام (Deep Link) خاص بالمستخدم الحالي' })
   async createLink(@CurrentUser() user: AuthenticatedUser) {
     const result = await this.telegram.generateLinkToken(user.userId);
     const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'Orange_2bot';
-
-    // ضمان بناء الرابط وإرجاع حالة التفعيل true دائماً
     const link = result.link || `https://t.me/${encodeURIComponent(botUsername)}?start=${encodeURIComponent(result.token)}`;
 
     return {
