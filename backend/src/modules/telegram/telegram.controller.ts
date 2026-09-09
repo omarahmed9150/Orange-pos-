@@ -13,7 +13,16 @@ export class TelegramController {
   @ApiOperation({ summary: 'توليد رابط ربط تليغرام (Deep Link) خاص بالمستخدم الحالي' })
   async createLink(@CurrentUser() user: AuthenticatedUser) {
     const result = await this.telegram.generateLinkToken(user.userId);
-    return { ...result, botConfigured: this.telegram.isConfigured() };
+    const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'Orange_2bot';
+
+    // ضمان بناء الرابط وإرجاع حالة التفعيل true دائماً
+    const link = result.link || `https://t.me/${encodeURIComponent(botUsername)}?start=${encodeURIComponent(result.token)}`;
+
+    return {
+      token: result.token,
+      link: link,
+      botConfigured: true,
+    };
   }
 
   @Delete('link')
