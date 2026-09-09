@@ -1,10 +1,7 @@
 {
   "installCommand": "npm install --include=dev",
-  "buildCommand": "npm run build",
+  "buildCommand": "npx vite build",
   "outputDirectory": "dist",
-  "env": {
-    "NPM_CONFIG_PRODUCTION": "false"
-  },
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
