@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { formatVariantLabel } from '../lib/format-variant';
+import { useAuth } from '../context/AuthContext';
+import { validStoreId } from '../lib/auth-storage';
 
 interface VariantWithProduct {
   id: string; sku: string; size?: string | null; color?: string | null;
@@ -13,6 +15,7 @@ interface Movement {
 }
 
 export function Inventory() {
+  const { user } = useAuth();
   const [alerts, setAlerts] = useState<{ lowStock: VariantWithProduct[]; expiringSoon: VariantWithProduct[]; expired: VariantWithProduct[] } | null>(null);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [message, setMessage] = useState('');
@@ -20,13 +23,17 @@ export function Inventory() {
   const [movementVariantId, setMovementVariantId] = useState('');
 
   async function load() {
+    if (!validStoreId(user?.storeId)) {
+      setAlerts(null);
+      return;
+    }
     const { data } = await api.get('/inventory/alerts');
     setAlerts(data);
   }
 
   useEffect(() => {
     load();
-  }, []);
+  }, [user?.storeId]);
 
   async function applyCount(variantId: string) {
     const countedQuantity = counts[variantId];

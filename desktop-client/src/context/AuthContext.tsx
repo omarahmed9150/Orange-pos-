@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 import { api } from '../lib/api';
+import { clearAuthSession, readStoredUser, saveAuthSession } from '../lib/auth-storage';
 
 export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'CASHIER';
 
@@ -26,23 +27,20 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(() => {
-    const raw = localStorage.getItem('orange_user');
-    return raw ? JSON.parse(raw) : null;
+    return readStoredUser();
   });
   const [locked, setLocked] = useState(false);
 
   async function login(username: string, password: string) {
-    localStorage.clear();
+    clearAuthSession();
     const { data } = await api.post('/auth/login', { username, password });
-    localStorage.setItem('orange_token', data.accessToken);
-    localStorage.setItem('orange_user', JSON.stringify(data.user));
-    localStorage.setItem('orange_store_id', data.user.storeId);
+    saveAuthSession(data.accessToken, data.user);
     setUser(data.user);
     setLocked(false);
   }
 
   function logout() {
-    localStorage.clear();
+    clearAuthSession();
     setUser(null);
     setLocked(false);
   }
@@ -65,9 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /** تبديل سريع لمستخدم آخر (كاشير مختلف) عبر اسم المستخدم + PIN بدل تسجيل خروج/دخول كامل */
   async function quickSwitchUser(username: string, pin: string) {
     const { data } = await api.post('/auth/quick-switch', { username, pin });
-    localStorage.setItem('orange_token', data.accessToken);
-    localStorage.setItem('orange_user', JSON.stringify(data.user));
-    localStorage.setItem('orange_store_id', data.user.storeId);
+    saveAuthSession(data.accessToken, data.user);
     setUser(data.user);
     setLocked(false);
   }

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { clearAuthSession } from './auth-storage';
 
 export const API_BASE_URL = 'https://backend-nine-swart-94.vercel.app/api';
 
@@ -20,8 +21,7 @@ api.interceptors.response.use(
   (res) => res,
   (error) => {
     if (error?.response?.status === 401) {
-      localStorage.removeItem('orange_token');
-      localStorage.removeItem('orange_user');
+      clearAuthSession();
       window.location.href = '/login';
     }
     return Promise.reject(error);

@@ -26,7 +26,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(payload: JwtPayload) {
     // نتحقق من حالة المستخدم في كل طلب لضمان تفعيل الحظر فوراً
     const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
-    if (!user || !user.isActive || !user.storeId) {
+    if (!user || !user.isActive || !user.storeId || user.storeId === 'null' || user.storeId === 'undefined') {
       throw new UnauthorizedException('الحساب غير موجود أو محظور');
     }
     return { userId: user.id, username: user.username, role: user.role, storeId: user.storeId };

@@ -1,4 +1,4 @@
-import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import { createParamDecorator, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 
 export interface AuthenticatedUser {
   userId: string;
@@ -11,6 +11,10 @@ export interface AuthenticatedUser {
 export const CurrentUser = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext): AuthenticatedUser => {
     const request = ctx.switchToHttp().getRequest();
-    return request.user;
+    const user = request.user as AuthenticatedUser | undefined;
+    if (!user?.storeId || user.storeId === 'null' || user.storeId === 'undefined') {
+      throw new UnauthorizedException('معرف المتجر غير صالح');
+    }
+    return user;
   },
 );

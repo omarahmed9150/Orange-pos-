@@ -409,7 +409,7 @@ export function Settings() {
             <a href={link} target="_blank" rel="noreferrer" className="block text-center bg-blue-500 text-white rounded-lg py-2 font-semibold">
               فتح Telegram للربط ↗
             </a>
-            <button onClick={unlink} className="w-full bg-gray-100 rounded-lg py-2 text-sm">
+            <button type="button" onClick={unlink} className="w-full bg-gray-100 rounded-lg py-2 text-sm">
               إلغاء الربط الحالي
             </button>
           </div>
