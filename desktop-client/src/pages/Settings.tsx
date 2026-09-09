@@ -96,6 +96,7 @@ export function Settings() {
 
   async function generateLink(e: MouseEvent<HTMLButtonElement>) {
     e?.preventDefault();
+    const newTab = window.open('about:blank', '_blank');
     setLoading(true);
     setMessage('');
     try {
@@ -103,10 +104,17 @@ export function Settings() {
         throw new Error('جلسة المستخدم لا تحتوي على معرف متجر صالح');
       }
       const { data } = await api.post('/telegram/link-token');
+      const telegramUrl = String(data.link || '');
+      const telegramLink = new URL(telegramUrl);
+      if (telegramLink.protocol !== 'https:' || telegramLink.hostname !== 't.me' || !telegramLink.searchParams.get('start')) {
+        throw new Error('رابط Telegram غير صالح');
+      }
       setBotConfigured(data.botConfigured);
-      setLink(data.link);
+      setLink(telegramUrl);
+      if (newTab) newTab.location.href = telegramUrl;
       setMessage('تم توليد رابط ربط Telegram بنجاح ✅');
     } catch (err: any) {
+      newTab?.close();
       setMessage(err?.response?.data?.message || 'تعذر توليد رابط الربط');
     } finally {
       setLoading(false);

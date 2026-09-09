@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 import * as ExcelJS from 'exceljs';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -17,7 +17,7 @@ export class BackupService {
   ) {}
 
   /** مهمة مجدولة يومياً الساعة 00:00 بالضبط - نسخة منفصلة لكل مستخدم مرتبط بتليغرام */
-  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  @Cron('0 0 * * *')
   async runDailyBackup() {
     if (!this.telegram.isConfigured()) {
       this.logger.warn('تخطي النسخ الاحتياطي: بوت تليغرام غير مضبوط.');
@@ -45,29 +45,33 @@ export class BackupService {
     const dayEnd = new Date();
     dayEnd.setHours(23, 59, 59, 999);
 
-    const [sales, expenses] = await Promise.all([
+    const [sales, expenses, stockMovements] = await Promise.all([
       this.prisma.sale.findMany({
-        where: { userId, storeId, createdAt: { gte: dayStart, lte: dayEnd } },
+        where: { storeId, createdAt: { gte: dayStart, lte: dayEnd } },
         include: { items: { include: { variant: { include: { product: true } } } } },
       }),
       this.prisma.expense.findMany({
-        where: { userId, storeId, createdAt: { gte: dayStart, lte: dayEnd } },
+        where: { storeId, createdAt: { gte: dayStart, lte: dayEnd } },
+      }),
+      this.prisma.stockMovement.findMany({
+        where: { storeId, createdAt: { gte: dayStart, lte: dayEnd } },
+        include: { variant: { include: { product: true } } },
       }),
     ]);
 
-    const filePath = await this.buildWorkbook(fullName, sales, expenses);
+    const filePath = await this.buildWorkbook(fullName, storeId, sales, expenses, stockMovements);
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '_');
 
     await this.telegram.sendDocumentToUser(
       chatId,
       filePath,
-      `📦 Backup_ORANGE_${dateStr}\nعدد الفواتير: ${sales.length} | عدد المصاريف: ${expenses.length}`,
+      `📦 تقرير ORANGE_${dateStr}\nالمبيعات: ${sales.length} | المصاريف: ${expenses.length} | حركات المخزون: ${stockMovements.length}`,
     );
 
     fs.unlinkSync(filePath);
   }
 
-  private async buildWorkbook(fullName: string, sales: any[], expenses: any[]) {
+  private async buildWorkbook(fullName: string, storeId: string, sales: any[], expenses: any[], stockMovements: any[]) {
     const workbook = new ExcelJS.Workbook();
 
     const salesSheet = workbook.addWorksheet('المبيعات');
@@ -98,14 +102,36 @@ export class BackupService {
       expensesSheet.addRow({ title: e.title, amount: e.amount, time: new Date(e.createdAt).toLocaleString('ar-EG') });
     }
 
+    const movementsSheet = workbook.addWorksheet('حركة المخزون');
+    movementsSheet.columns = [
+      { header: 'الصنف', key: 'product', width: 28 },
+      { header: 'SKU', key: 'sku', width: 20 },
+      { header: 'النوع', key: 'type', width: 22 },
+      { header: 'الكمية', key: 'quantity', width: 12 },
+      { header: 'السبب', key: 'reason', width: 30 },
+      { header: 'الوقت', key: 'time', width: 20 },
+    ];
+    for (const movement of stockMovements) {
+      movementsSheet.addRow({
+        product: movement.variant?.product?.name || 'غير معروف',
+        sku: movement.variant?.sku || '',
+        type: movement.type,
+        quantity: movement.quantity,
+        reason: movement.reason || '',
+        time: new Date(movement.createdAt).toLocaleString('ar-EG'),
+      });
+    }
+
     const summarySheet = workbook.addWorksheet('الملخص');
     const totalSales = sales.reduce((s, x) => s + x.totalAmount, 0);
     const totalExpenses = expenses.reduce((s, x) => s + x.amount, 0);
     summarySheet.addRows([
       ['الموظف', fullName],
+      ['المتجر', storeId],
       ['التاريخ', new Date().toLocaleDateString('ar-EG')],
       ['إجمالي المبيعات', totalSales],
       ['إجمالي المصاريف', totalExpenses],
+      ['عدد حركات المخزون', stockMovements.length],
       ['صافي اليوم', totalSales - totalExpenses],
     ]);
 
