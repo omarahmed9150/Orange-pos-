@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StoreSettingsService } from '../store-settings/store-settings.service';
@@ -64,14 +64,22 @@ export class TelegramService {
 
   /** يولّد توكن ربط مؤقت ورابط Deep Link خاص بالمستخدم */
   async generateLinkToken(userId: string, storeId: string) {
-    assertStoreId(storeId);
-    const token = crypto.randomBytes(16).toString('hex');
-    await this.prisma.user.update({ where: { id: userId, storeId }, data: { telegramLinkToken: token } });
+    try {
+      assertStoreId(storeId);
+      const token = crypto.randomBytes(16).toString('hex');
+      await this.prisma.user.update({ where: { id: userId, storeId }, data: { telegramLinkToken: token } });
 
-    const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'Orange_2bot';
-    const link = `https://t.me/${encodeURIComponent(botUsername)}?start=${encodeURIComponent(token)}`;
+      const botUsername = process.env.TELEGRAM_BOT_NAME
+        || process.env.TELEGRAM_BOT_USERNAME
+        || 'YourBotName';
+      const link = `https://t.me/${encodeURIComponent(botUsername)}?start=${encodeURIComponent(token)}`;
 
-    return { token, link };
+      return { token, link };
+    } catch (error) {
+      this.logger.error(`فشل توليد رابط Telegram للمستخدم ${userId}:`, error instanceof Error ? error.stack : String(error));
+      if (error instanceof BadRequestException) throw error;
+      throw new BadRequestException('تعذر توليد رابط الربط حالياً');
+    }
   }
 
   async unlink(userId: string, storeId: string) {

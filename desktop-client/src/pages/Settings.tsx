@@ -115,7 +115,7 @@ export function Settings() {
       setMessage('تم توليد رابط ربط Telegram بنجاح ✅');
     } catch (err: any) {
       newTab?.close();
-      setMessage(err?.response?.data?.message || 'تعذر توليد رابط الربط');
+      setMessage(err?.response?.data?.message || err?.message || 'تعذر توليد رابط الربط');
     } finally {
       setLoading(false);
     }
