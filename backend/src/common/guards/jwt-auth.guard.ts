@@ -21,4 +21,21 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     if (isPublic) return true;
     return super.canActivate(context);
   }
+
+  handleRequest<TUser extends { accessToken?: string }>(
+    err: unknown,
+    user: TUser | undefined,
+    info: unknown,
+    context: ExecutionContext,
+  ): TUser {
+    if (err || !user) {
+      return super.handleRequest(err, user, info, context);
+    }
+
+    const accessToken = user.accessToken;
+    if (accessToken) {
+      context.switchToHttp().getResponse().setHeader('x-renewed-token', accessToken);
+    }
+    return user;
+  }
 }

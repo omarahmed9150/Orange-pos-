@@ -5,6 +5,7 @@ export interface AuthenticatedUser {
   username: string;
   role: string;
   storeId: string;
+  accessToken?: string;
 }
 
 /** يستخرج المستخدم الحالي من التوكن (لتطبيق عزل البيانات في كل Service) */

@@ -18,6 +18,7 @@ describe('AuthService', () => {
     fullName: 'أحمد',
     role: UserRole.CASHIER,
     isActive: true,
+    storeId: 'store-1',
   };
 
   beforeAll(async () => {
@@ -61,6 +62,7 @@ describe('AuthService', () => {
         username: 'cashier1',
         fullName: 'أحمد',
         role: UserRole.CASHIER,
+        storeId: 'store-1',
       });
       expect((result.user as any).passwordHash).toBeUndefined();
     });

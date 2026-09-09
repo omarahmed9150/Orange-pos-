@@ -15,6 +15,7 @@ export function createPrismaMock() {
   });
 
   const prisma: any = {
+    store: model(),
     user: model(),
     sale: model(),
     saleItem: model(),

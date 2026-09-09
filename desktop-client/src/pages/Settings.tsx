@@ -1,6 +1,7 @@
 import { useEffect, useState, type MouseEvent } from 'react';
 import { api } from '../lib/api';
 import { useI18n } from '../context/I18nContext';
+import { getStoredTokenStoreId } from '../lib/auth-storage';
 
 interface StoreSettingsData {
   storeName: string;
@@ -98,10 +99,12 @@ export function Settings() {
     setLoading(true);
     setMessage('');
     try {
+      if (!getStoredTokenStoreId()) {
+        throw new Error('جلسة المستخدم لا تحتوي على معرف متجر صالح');
+      }
       const { data } = await api.post('/telegram/link-token');
       setBotConfigured(data.botConfigured);
       setLink(data.link);
-       window.open(data.link, '_blank', 'noopener,noreferrer');
       setMessage('تم توليد رابط ربط Telegram بنجاح ✅');
     } catch (err: any) {
       setMessage(err?.response?.data?.message || 'تعذر توليد رابط الربط');

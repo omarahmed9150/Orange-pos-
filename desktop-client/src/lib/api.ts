@@ -18,7 +18,13 @@ api.interceptors.request.use((config) => {
 
 // عند انتهاء صلاحية الجلسة أو الحظر -> تسجيل خروج تلقائي
 api.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    const renewedToken = res.headers['x-renewed-token'];
+    if (typeof renewedToken === 'string' && renewedToken) {
+      localStorage.setItem('orange_token', renewedToken);
+    }
+    return res;
+  },
   (error) => {
     if (error?.response?.status === 401) {
       const isTelegramRequest = String(error?.config?.url || '').includes('/telegram');
@@ -31,7 +37,7 @@ api.interceptors.response.use(
         return Promise.reject(error);
       }
       clearAuthSession();
-      window.location.href = '/login';
+      window.location.hash = '#/login';
     }
     return Promise.reject(error);
   },

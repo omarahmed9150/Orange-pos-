@@ -9,6 +9,7 @@ import { SetPinDto } from './dto/set-pin.dto';
 import { VerifyPinDto } from './dto/verify-pin.dto';
 import { QuickSwitchDto } from './dto/quick-switch.dto';
 import { RegisterDto } from './dto/register.dto';
+import { isValidStoreId } from '../../common/security/store-scope';
 
 @Injectable()
 export class AuthService {
@@ -146,7 +147,7 @@ export class AuthService {
   }
 
   private async ensureStoreAssignment(user: User): Promise<User> {
-    if (user.storeId && user.storeId !== 'null' && user.storeId !== 'undefined') {
+    if (isValidStoreId(user.storeId)) {
       return user;
     }
 

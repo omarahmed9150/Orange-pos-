@@ -37,6 +37,7 @@ export class TelegramService {
         return;
       }
 
+      assertStoreId(user.storeId);
       await this.storeSettings.setTelegramChatId(user.storeId, chatId);
       await this.prisma.user.update({
         where: { id: user.id },
@@ -76,7 +77,7 @@ export class TelegramService {
   async unlink(userId: string, storeId: string) {
     assertStoreId(storeId);
     await this.storeSettings.setTelegramChatId(storeId, null);
-    await this.prisma.user.update({ where: { id: userId }, data: { telegramChatId: null } });
+    await this.prisma.user.update({ where: { id: userId, storeId }, data: { telegramChatId: null } });
   }
   isConfigured() {
     return Boolean(process.env.TELEGRAM_BOT_TOKEN || process.env.TELEGRAM_BOT_USERNAME || 'Orange_2bot');
