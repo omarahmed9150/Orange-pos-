@@ -54,7 +54,7 @@ export class UsersService {
     if (dto.isActive !== undefined) data.isActive = dto.isActive;
     if (dto.password) data.passwordHash = await bcrypt.hash(dto.password, 12);
 
-    const updated = await this.prisma.user.update({ where: { id }, data });
+    const updated = await this.prisma.user.update({ where: { id, storeId: actor.storeId }, data });
 
     await this.audit.log(actingUserId, 'USER_UPDATED', 'User', id, {
       changedFields: Object.keys(data).filter((k) => k !== 'passwordHash'),
@@ -79,7 +79,7 @@ export class UsersService {
       throw new ConflictException('لا يمكن حظر المستخدم الحالي');
     }
 
-    await this.prisma.user.update({ where: { id }, data: { isActive: false } });
+    await this.prisma.user.update({ where: { id, storeId: actor.storeId }, data: { isActive: false } });
     await this.audit.log(actingUserId, 'USER_BLOCKED', 'User', id, { username: user.username });
 
     return { message: 'تم حظر المستخدم بنجاح (تم الاحتفاظ بسجلاته المالية)' };

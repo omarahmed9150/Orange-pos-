@@ -51,7 +51,7 @@ export class SalesService {
 
     const variantIds = dto.items.map((item) => item.variantId);
     const variants = await this.prisma.variant.findMany({
-      where: { id: { in: variantIds }, storeId },
+      where: { id: { in: variantIds }, storeId, product: { storeId } },
       include: { product: true },
     });
 
@@ -88,7 +88,7 @@ export class SalesService {
     const sale = await this.prisma.$transaction(async (tx) => {
       for (const item of dto.items) {
         const updated = await tx.variant.updateMany({
-          where: { id: item.variantId, stockQuantity: { gte: item.quantity } },
+          where: { id: item.variantId, storeId, product: { storeId }, stockQuantity: { gte: item.quantity } },
           data: { stockQuantity: { decrement: item.quantity } },
         });
         if (updated.count !== 1) {
@@ -96,8 +96,8 @@ export class SalesService {
         }
         await tx.stockMovement.create({
           data: {
-            storeId,
             variantId: item.variantId,
+            storeId,
             userId,
             type: StockMovementType.SALE,
             quantity: -item.quantity,
@@ -134,7 +134,7 @@ export class SalesService {
           },
         },
         include: {
-          items: { include: { variant: { include: { product: true } } } },
+          items: { where: { storeId }, include: { variant: { include: { product: true } } } },
         },
       });
     });
@@ -160,7 +160,7 @@ export class SalesService {
         ...(isPrivileged ? {} : { userId: requester.userId }),
       },
       include: {
-        items: { include: { variant: { include: { product: true } } } },
+        items: { where: { ...(requester.storeId ? { storeId: requester.storeId } : {}) }, include: { variant: { include: { product: true } } } },
         user: { select: { fullName: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -171,7 +171,7 @@ export class SalesService {
     const sale = await this.prisma.sale.findUnique({
       where: { id, ...(requester.storeId ? { storeId: requester.storeId } : {}) },
       include: {
-        items: { include: { variant: { include: { product: true } } } },
+        items: { where: { ...(requester.storeId ? { storeId: requester.storeId } : {}) }, include: { variant: { include: { product: true } } } },
       },
     });
 
@@ -191,7 +191,7 @@ export class SalesService {
   async refund(id: string, dto: RefundSaleDto, actor: { userId: string; username: string; storeId?: string }) {
     const sale = await this.prisma.sale.findUnique({
       where: { id, ...(actor.storeId ? { storeId: actor.storeId } : {}) },
-      include: { items: true },
+      include: { items: { where: { storeId: actor.storeId } } },
     });
 
     if (!sale) throw new NotFoundException(`Sale ${id} not found`);
@@ -227,17 +227,18 @@ export class SalesService {
       for (const req of itemsToRefund) {
         const saleItem = sale.items.find((i) => i.id === req.saleItemId)!;
         const updatedItem = await tx.saleItem.updateMany({
-          where: { id: req.saleItemId, refundedQty: { lte: saleItem.quantity - req.quantity } },
+          where: { id: req.saleItemId, storeId: actor.storeId, refundedQty: { lte: saleItem.quantity - req.quantity } },
           data: { refundedQty: { increment: req.quantity } },
         });
         if (updatedItem.count !== 1) throw new BadRequestException('تغيرت حالة الاسترجاع، أعد المحاولة');
         await tx.variant.update({
-          where: { id: saleItem.variantId },
+          where: { id: saleItem.variantId, storeId: actor.storeId, product: { storeId: actor.storeId } },
           data: { stockQuantity: { increment: req.quantity } },
         });
         await tx.stockMovement.create({
           data: {
             variantId: saleItem.variantId,
+            storeId: actor.storeId,
             userId: actor.userId,
             type: StockMovementType.REFUND,
             quantity: req.quantity,
@@ -246,11 +247,11 @@ export class SalesService {
         });
       }
 
-      const updatedItems = await tx.saleItem.findMany({ where: { saleId: id } });
+      const updatedItems = await tx.saleItem.findMany({ where: { saleId: id, storeId: actor.storeId } });
       const fullyRefunded = updatedItems.every((i) => i.refundedQty >= i.quantity);
 
       await tx.sale.update({
-        where: { id },
+        where: { id, storeId: actor.storeId },
         data: {
           refundStatus: fullyRefunded ? RefundStatus.FULL : RefundStatus.PARTIAL,
           refundedAt: new Date(),
@@ -267,8 +268,8 @@ export class SalesService {
     });
 
     return this.prisma.sale.findUnique({
-      where: { id },
-      include: { items: { include: { variant: { include: { product: true } } } } },
+      where: { id, storeId: actor.storeId },
+      include: { items: { where: { storeId: actor.storeId }, include: { variant: { include: { product: true } } } } },
     });
   }
 
@@ -279,11 +280,11 @@ export class SalesService {
   async exchange(id: string, dto: ExchangeSaleDto, actor: { userId: string; username: string; storeId?: string }) {
     const originalSale = await this.prisma.sale.findUnique({
       where: { id, ...(actor.storeId ? { storeId: actor.storeId } : {}) },
-      include: { items: true },
+      include: { items: { where: { ...(actor.storeId ? { storeId: actor.storeId } : {}) } } },
     });
 
     if (!originalSale) throw new NotFoundException(`Sale ${id} not found`);
-    const exchangeShift = await this.prisma.shift.findUnique({ where: { id: dto.shiftId } });
+    const exchangeShift = await this.prisma.shift.findUnique({ where: { id: dto.shiftId, storeId: actor.storeId } });
     if (!exchangeShift || (actor.storeId && exchangeShift.storeId !== actor.storeId) || exchangeShift.cashierId !== actor.userId || exchangeShift.status !== ShiftStatus.OPEN) {
       throw new BadRequestException('الوردية غير صالحة أو لا تملكها');
     }
@@ -318,7 +319,7 @@ export class SalesService {
 
     // تحقق توفر مخزون الأصناف الجديدة
     const newVariantIds = dto.newItems.map((i) => i.variantId);
-    const newVariants = await this.prisma.variant.findMany({ where: { id: { in: newVariantIds }, ...(actor.storeId ? { storeId: actor.storeId } : {}) } });
+    const newVariants = await this.prisma.variant.findMany({ where: { id: { in: newVariantIds }, ...(actor.storeId ? { storeId: actor.storeId, product: { storeId: actor.storeId } } : {}) } });
     if (newVariants.length !== newVariantIds.length) {
       throw new NotFoundException('صنف بديل غير موجود');
     }
@@ -345,17 +346,18 @@ export class SalesService {
       for (const req of dto.returnItems) {
         const saleItem = originalSale.items.find((i) => i.id === req.saleItemId)!;
         const updatedItem = await tx.saleItem.updateMany({
-          where: { id: req.saleItemId, refundedQty: { lte: saleItem.quantity - req.quantity } },
+          where: { id: req.saleItemId, storeId: actor.storeId, refundedQty: { lte: saleItem.quantity - req.quantity } },
           data: { refundedQty: { increment: req.quantity } },
         });
         if (updatedItem.count !== 1) throw new BadRequestException('تغيرت حالة الاسترجاع، أعد المحاولة');
         await tx.variant.update({
-          where: { id: saleItem.variantId },
+          where: { id: saleItem.variantId, storeId: actor.storeId, product: { storeId: actor.storeId } },
           data: { stockQuantity: { increment: req.quantity } },
         });
         await tx.stockMovement.create({
           data: {
             variantId: saleItem.variantId,
+            storeId: actor.storeId,
             userId: actor.userId,
             type: StockMovementType.REFUND,
             quantity: req.quantity,
@@ -364,11 +366,11 @@ export class SalesService {
         });
       }
 
-      const updatedOriginalItems = await tx.saleItem.findMany({ where: { saleId: id } });
+      const updatedOriginalItems = await tx.saleItem.findMany({ where: { saleId: id, storeId: actor.storeId } });
       const fullyRefunded = updatedOriginalItems.every((i) => i.refundedQty >= i.quantity);
 
       await tx.sale.update({
-        where: { id },
+        where: { id, storeId: actor.storeId },
         data: {
           refundStatus: fullyRefunded ? RefundStatus.FULL : RefundStatus.PARTIAL,
           refundedAt: new Date(),
@@ -380,13 +382,14 @@ export class SalesService {
       // خصم مخزون الأصناف الجديدة وتسجيل فاتورة بديلة
       for (const item of dto.newItems) {
         const updated = await tx.variant.updateMany({
-          where: { id: item.variantId, stockQuantity: { gte: item.quantity } },
+          where: { id: item.variantId, storeId: actor.storeId, product: { storeId: actor.storeId }, stockQuantity: { gte: item.quantity } },
           data: { stockQuantity: { decrement: item.quantity } },
         });
         if (updated.count !== 1) throw new BadRequestException('المخزون غير كافٍ أو تغيّر أثناء العملية');
         await tx.stockMovement.create({
           data: {
             variantId: item.variantId,
+            storeId: actor.storeId,
             userId: actor.userId,
             type: StockMovementType.SALE,
             quantity: -item.quantity,
@@ -417,7 +420,7 @@ export class SalesService {
             }),
           },
         },
-        include: { items: true },
+        include: { items: { where: { ...(actor.storeId ? { storeId: actor.storeId } : {}) } } },
       });
     });
 
@@ -431,12 +434,12 @@ export class SalesService {
 
     const finalNewSale = await this.prisma.sale.findFirst({
       where: { id: newSale.id, ...(actor.storeId ? { storeId: actor.storeId } : {}) },
-      include: { items: { include: { variant: { include: { product: true } } } } },
+      include: { items: { where: { ...(actor.storeId ? { storeId: actor.storeId } : {}) }, include: { variant: { include: { product: true } } } } },
     });
 
     const finalOriginalSale = await this.prisma.sale.findFirst({
       where: { id, ...(actor.storeId ? { storeId: actor.storeId } : {}) },
-      include: { items: { include: { variant: { include: { product: true } } } } },
+      include: { items: { where: { ...(actor.storeId ? { storeId: actor.storeId } : {}) }, include: { variant: { include: { product: true } } } } },
     });
 
     return {

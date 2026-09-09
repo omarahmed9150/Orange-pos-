@@ -39,8 +39,8 @@ export class ProductsController {
   @Get('generate-barcode')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'توليد باركود داخلي فريد لمنتج ليس له باركود من المصنع' })
-  async generateBarcode() {
-    const barcode = await this.productsService.generateUniqueBarcode();
+  async generateBarcode(@CurrentUser() user: AuthenticatedUser) {
+    const barcode = await this.productsService.generateUniqueBarcode(user.storeId);
     return { barcode };
   }
 

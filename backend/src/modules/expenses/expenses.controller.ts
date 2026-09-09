@@ -14,12 +14,12 @@ export class ExpensesController {
   @Post()
   @ApiOperation({ summary: 'تسجيل مصروف تشغيلي/يومي' })
   create(@Body() dto: CreateExpenseDto, @CurrentUser() user: AuthenticatedUser) {
-    return this.expensesService.create(dto, user.userId);
+    return this.expensesService.create(dto, user.userId, user.storeId);
   }
 
   @Get()
   @ApiOperation({ summary: 'عرض المصاريف (معزولة حسب المستخدم للكاشير)' })
   findAll(@CurrentUser() user: AuthenticatedUser) {
-    return this.expensesService.findAll({ userId: user.userId, role: user.role as UserRole });
+    return this.expensesService.findAll({ userId: user.userId, role: user.role as UserRole, storeId: user.storeId });
   }
 }

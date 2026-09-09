@@ -28,14 +28,14 @@ export class EmailBackupController {
     if (!email) {
       return { success: false, message: 'Email address is required' };
     }
-    return this.emailBackupService.sendBackupEmail(email, user.userId);
+    return this.emailBackupService.sendBackupEmail(email, user.userId, user.storeId);
   }
 
   @Get('download')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'تنزيل نسخة Excel محلياً عند تعذر البريد' })
   async downloadBackup(@CurrentUser() user: AuthenticatedUser, @Res() res: Response) {
-    const { buffer, fileName } = await this.emailBackupService.buildDownloadBackup(user.userId);
+    const { buffer, fileName } = await this.emailBackupService.buildDownloadBackup(user.userId, user.storeId);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
     res.send(buffer);

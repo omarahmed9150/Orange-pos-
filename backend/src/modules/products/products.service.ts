@@ -51,7 +51,7 @@ export class ProductsService {
           })),
         },
       },
-      include: { variants: true },
+      include: { variants: { where: { storeId } } },
     });
   }
 
@@ -60,23 +60,23 @@ export class ProductsService {
     if (!product) throw new NotFoundException(`Product ${id} not found`);
 
     return this.prisma.product.update({
-      where: { id },
+      where: { id, storeId },
       data: { imageUrl },
-      include: { variants: true },
+      include: { variants: { where: { storeId } } },
     });
   }
 
   async update(id: string, dto: UpdateProductDto, userId: string, storeId: string) {
     const product = await this.prisma.product.findFirst({
       where: { id, storeId },
-      include: { variants: { take: 1 } },
+      include: { variants: { where: { storeId }, take: 1 } },
     });
     if (!product || !product.variants[0]) throw new NotFoundException(`Product ${id} not found`);
 
     const { name, category, imageUrl, barcode, costPrice, sellingPrice, wholesalePrice, vipPrice, stockQuantity } = dto;
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.product.update({
-        where: { id },
+        where: { id, storeId },
         data: {
           ...(name !== undefined ? { name } : {}),
           ...(category !== undefined ? { category } : {}),
@@ -84,7 +84,7 @@ export class ProductsService {
         },
       });
       return tx.variant.update({
-        where: { id: product.variants[0].id },
+        where: { id: product.variants[0].id, storeId, product: { storeId } },
         data: {
           ...(barcode !== undefined ? { barcode } : {}),
           ...(costPrice !== undefined ? { costPrice } : {}),
@@ -103,7 +103,7 @@ export class ProductsService {
   async remove(id: string, userId: string, storeId: string) {
     const product = await this.prisma.product.findFirst({ where: { id, storeId } });
     if (!product) throw new NotFoundException(`Product ${id} not found`);
-    await this.prisma.product.delete({ where: { id } });
+    await this.prisma.product.delete({ where: { id, storeId } });
     await this.audit.log(userId, 'PRODUCT_DELETED', 'Product', id, { name: product.name });
     return { deleted: true };
   }
@@ -114,7 +114,7 @@ export class ProductsService {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
-      const variant = await tx.variant.findFirst({ where: { id: variantId, storeId } });
+      const variant = await tx.variant.findFirst({ where: { id: variantId, storeId, product: { storeId } } });
       if (!variant) throw new NotFoundException(`Variant ${variantId} not found`);
 
       const data: { sellingPrice?: number; stockQuantity?: number } = {};
@@ -122,7 +122,7 @@ export class ProductsService {
       if (dto.stockQuantity !== undefined) data.stockQuantity = dto.stockQuantity;
 
       const updated = await tx.variant.update({
-        where: { id: variantId },
+        where: { id: variantId, storeId, product: { storeId } },
         data,
         include: { product: true },
       });
@@ -152,7 +152,7 @@ export class ProductsService {
   findAll(storeId: string) {
     return this.prisma.product.findMany({
       where: { storeId },
-      include: { variants: true },
+      include: { variants: { where: { storeId } } },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -172,7 +172,8 @@ export class ProductsService {
           {
             variants: {
               some: {
-                OR: [
+              storeId,
+              OR: [
                   { sku: { contains: term } },
                   { barcode: { contains: term } },
                   { color: { contains: term } },
@@ -183,7 +184,7 @@ export class ProductsService {
           },
         ],
       },
-      include: { variants: true },
+      include: { variants: { where: { storeId } } },
       orderBy: { name: 'asc' },
     });
   }
@@ -191,7 +192,7 @@ export class ProductsService {
   async findOne(id: string, storeId: string) {
     const product = await this.prisma.product.findUnique({
       where: { id, storeId },
-      include: { variants: true },
+      include: { variants: { where: { storeId } } },
     });
 
     if (!product) {
@@ -203,7 +204,7 @@ export class ProductsService {
 
   async findByBarcode(barcode: string, storeId: string) {
     const variant = await this.prisma.variant.findFirst({
-      where: { barcode, storeId },
+      where: { barcode, storeId, product: { storeId } },
       include: { product: true },
     });
 
@@ -216,7 +217,7 @@ export class ProductsService {
 
   async findBySku(sku: string, storeId: string) {
     const variant = await this.prisma.variant.findFirst({
-      where: { sku, storeId },
+      where: { sku, storeId, product: { storeId } },
       include: { product: true },
     });
 
@@ -231,12 +232,12 @@ export class ProductsService {
    * يولّد باركوداً داخلياً فريداً للمنتجات التي لا تملك باركوداً من المصنع (12 رقماً تبدأ بـ 9).
    * لا يتقاطع مع صيغة باركود الميزان الإلكتروني (13 رقماً تبدأ بـ 2) المُستخدَمة بشاشة البيع.
    */
-  async generateUniqueBarcode(): Promise<string> {
+  async generateUniqueBarcode(storeId: string): Promise<string> {
     for (let attempt = 0; attempt < 20; attempt++) {
       const randomDigits = Array.from({ length: 11 }, () => Math.floor(Math.random() * 10)).join('');
       const candidate = `9${randomDigits}`;
 
-      const existing = await this.prisma.variant.findUnique({ where: { barcode: candidate } });
+      const existing = await this.prisma.variant.findFirst({ where: { barcode: candidate, storeId, product: { storeId } } });
       if (!existing) return candidate;
     }
     throw new Error('تعذّر توليد باركود فريد - أعد المحاولة');
@@ -288,7 +289,7 @@ export class ProductsService {
       return idx ? row.getCell(idx).value : undefined;
     };
 
-    const existingSkus = new Set((await this.prisma.variant.findMany({ where: { storeId }, select: { sku: true } })).map((v) => v.sku));
+    const existingSkus = new Set((await this.prisma.variant.findMany({ where: { storeId, product: { storeId } }, select: { sku: true } })).map((v) => v.sku));
     const productCache = new Map<string, string>(); // "name|category" -> productId
 
     let imported = 0;

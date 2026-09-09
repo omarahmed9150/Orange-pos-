@@ -28,19 +28,19 @@ export class SuppliersController {
 
   @Get('alerts/overdue-debt')
   @ApiOperation({ summary: 'كل الموردين الذين لهم دين مستحق علينا 30 يوماً فأكثر' })
-  getOverdueDebtAlerts() {
-    return this.suppliersService.getOverdueDebtAlerts();
+  getOverdueDebtAlerts(@CurrentUser() user: AuthenticatedUser) {
+    return this.suppliersService.getOverdueDebtAlerts(user.storeId);
   }
 
   @Get(':id/statement')
   @ApiOperation({ summary: 'كشف حساب المورد (مشتريات، مدفوعات، الدين المتبقي)' })
-  getStatement(@Param('id') id: string) {
-    return this.suppliersService.getStatement(id);
+  getStatement(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.suppliersService.getStatement(id, user.storeId);
   }
 
   @Post(':id/payments')
   @ApiOperation({ summary: 'تسجيل دفعة تسديد لدين المورد' })
   addPayment(@Param('id') id: string, @Body() dto: CreateSupplierPaymentDto, @CurrentUser() user: AuthenticatedUser) {
-    return this.suppliersService.addPayment(id, dto, user.userId);
+    return this.suppliersService.addPayment(id, dto, user.userId, user.storeId);
   }
 }

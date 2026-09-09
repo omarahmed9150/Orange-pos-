@@ -14,20 +14,20 @@ export class InventoryController {
 
   @Get('alerts')
   @ApiOperation({ summary: 'تنبيهات نفاد المخزون وقرب انتهاء الصلاحية' })
-  getAlerts() {
-    return this.inventoryService.getAlerts();
+  getAlerts(@CurrentUser() user: AuthenticatedUser) {
+    return this.inventoryService.getAlerts(user.storeId);
   }
 
   @Get('movements/:variantId')
   @ApiOperation({ summary: 'سجل حركة صنف معيّن' })
-  movementHistory(@Param('variantId') variantId: string) {
-    return this.inventoryService.movementHistory(variantId);
+  movementHistory(@Param('variantId') variantId: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.inventoryService.movementHistory(variantId, user.storeId);
   }
 
   @Post('count')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'تطبيق جرد كامل أو جزئي (يعدّل الفروقات تلقائياً)' })
   applyStockCount(@Body() dto: StockCountDto, @CurrentUser() user: AuthenticatedUser) {
-    return this.inventoryService.applyStockCount(dto, user.userId);
+    return this.inventoryService.applyStockCount(dto, user.userId, user.storeId);
   }
 }

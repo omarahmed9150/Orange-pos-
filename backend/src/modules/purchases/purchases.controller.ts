@@ -16,12 +16,12 @@ export class PurchasesController {
   @Post()
   @ApiOperation({ summary: 'تسجيل فاتورة شراء (تزيد المخزون تلقائياً)' })
   create(@Body() dto: CreatePurchaseDto, @CurrentUser() user: AuthenticatedUser) {
-    return this.purchasesService.create(dto, user.userId);
+    return this.purchasesService.create(dto, user.userId, user.storeId);
   }
 
   @Get()
   @ApiOperation({ summary: 'عرض كل فواتير الشراء' })
-  findAll() {
-    return this.purchasesService.findAll();
+  findAll(@CurrentUser() user: AuthenticatedUser) {
+    return this.purchasesService.findAll(user.storeId);
   }
 }

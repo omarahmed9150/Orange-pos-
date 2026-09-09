@@ -2,6 +2,7 @@ import { Controller, Get, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { AuditService } from './audit.service';
 
 @ApiTags('Audit Log')
@@ -15,7 +16,7 @@ export class AuditController {
   @ApiOperation({ summary: 'عرض سجل التدقيق لكل العمليات الحساسة (لا يمكن حذفه من أي واجهة)' })
   @ApiQuery({ name: 'entityType', required: false })
   @ApiQuery({ name: 'userId', required: false })
-  findAll(@Query('entityType') entityType?: string, @Query('userId') userId?: string) {
-    return this.auditService.findAll({ entityType, userId });
+  findAll(@Query('entityType') entityType: string | undefined, @Query('userId') userId: string | undefined, @CurrentUser() user: AuthenticatedUser) {
+    return this.auditService.findAll({ entityType, userId, storeId: user.storeId });
   }
 }

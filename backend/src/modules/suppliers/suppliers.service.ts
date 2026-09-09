@@ -25,12 +25,12 @@ export class SuppliersService {
    * يحسب الدين المتبقي وتاريخ أقدم فاتورة شراء لم تُغطَّ بعد بالدفعات (تخصيص FIFO)
    * - نفس منطق تنبيه ديون العملاء لكن بالاتجاه المعاكس (نحن مدينون للمورد)
    */
-  private async calculateDebtInfo(supplierId: string) {
+  private async calculateDebtInfo(supplierId: string, storeId: string) {
     const invoices = await this.prisma.purchaseInvoice.findMany({
-      where: { supplierId },
+      where: { supplierId, storeId, supplier: { storeId } },
       orderBy: { createdAt: 'asc' },
     });
-    const payments = await this.prisma.supplierPayment.findMany({ where: { supplierId } });
+    const payments = await this.prisma.supplierPayment.findMany({ where: { supplierId, storeId, supplier: { storeId } } });
 
     const totalPurchases = invoices.reduce((s, p) => s + p.totalAmount, 0);
     const totalPaid = payments.reduce((s, p) => s + p.amount, 0);
@@ -62,16 +62,16 @@ export class SuppliersService {
   }
 
   /** كشف حساب المورد: إجمالي المشتريات - إجمالي المدفوع = الدين المتبقي + معلومات التأخير */
-  async getStatement(supplierId: string) {
+  async getStatement(supplierId: string, storeId = 'default-store') {
     const supplier = await this.prisma.supplier.findUnique({
-      where: { id: supplierId },
+      where: { id: supplierId, storeId },
       include: {
-        purchaseInvoices: { orderBy: { createdAt: 'desc' } },
-        payments: { orderBy: { createdAt: 'desc' } },
+        purchaseInvoices: { where: { storeId }, orderBy: { createdAt: 'desc' } },
+        payments: { where: { storeId }, orderBy: { createdAt: 'desc' } },
       },
     });
     if (!supplier) throw new NotFoundException('المورد غير موجود');
-    const debtInfo = await this.calculateDebtInfo(supplierId);
+    const debtInfo = await this.calculateDebtInfo(supplierId, storeId);
 
     return {
       supplier: { id: supplier.id, name: supplier.name, phone: supplier.phone },
@@ -82,20 +82,20 @@ export class SuppliersService {
   }
 
   /** تنبيه: كل الموردين الذين لهم دين مستحق علينا 30 يوماً فأكثر - تُستخدم بواجهة الموردين */
-  async getOverdueDebtAlerts() {
-    const suppliers = await this.prisma.supplier.findMany();
+  async getOverdueDebtAlerts(storeId = 'default-store') {
+    const suppliers = await this.prisma.supplier.findMany({ where: { storeId } });
     const results = await Promise.all(
-      suppliers.map(async (s) => ({ supplier: s, ...(await this.calculateDebtInfo(s.id)) })),
+      suppliers.map(async (s) => ({ supplier: s, ...(await this.calculateDebtInfo(s.id, storeId)) })),
     );
     return results.filter((r) => r.isOverdue);
   }
 
-  async addPayment(supplierId: string, dto: CreateSupplierPaymentDto, userId: string) {
-    const supplier = await this.prisma.supplier.findUnique({ where: { id: supplierId } });
+  async addPayment(supplierId: string, dto: CreateSupplierPaymentDto, userId: string, storeId = 'default-store') {
+    const supplier = await this.prisma.supplier.findFirst({ where: { id: supplierId, storeId } });
     if (!supplier) throw new NotFoundException('المورد غير موجود');
 
     const payment = await this.prisma.supplierPayment.create({
-      data: { supplierId, userId, amount: dto.amount, notes: dto.notes },
+      data: { storeId, supplierId, userId, amount: dto.amount, notes: dto.notes },
     });
 
     await this.audit.log(userId, 'SUPPLIER_PAYMENT_ADDED', 'Supplier', supplierId, { amount: dto.amount });

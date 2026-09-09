@@ -64,7 +64,7 @@ export class ReceiptTemplatesService {
     const template = await this.prisma.receiptTemplate.findFirst({ where: { id, storeId } });
     if (!template) throw new NotFoundException('القالب غير موجود');
 
-    await this.prisma.receiptTemplate.delete({ where: { id } });
+    await this.prisma.receiptTemplate.delete({ where: { id, storeId } });
     await this.audit.log(actingUserId, 'RECEIPT_TEMPLATE_DELETED', 'ReceiptTemplate', id, { name: template.name });
 
     return { message: 'تم حذف القالب' };

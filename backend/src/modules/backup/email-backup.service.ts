@@ -38,10 +38,10 @@ export class EmailBackupService {
     return !!this.transporter;
   }
 
-  async buildDownloadBackup(userId: string): Promise<{ buffer: Buffer; fileName: string }> {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+  async buildDownloadBackup(userId: string, storeId: string): Promise<{ buffer: Buffer; fileName: string }> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId, storeId } });
     if (!user) throw new BadRequestException('User not found');
-    const filePath = await this.buildCompleteBackup(user.fullName);
+    const filePath = await this.buildCompleteBackup(user.fullName, storeId);
     const fileName = `orange_backup_${new Date().toISOString().slice(0, 10).replace(/-/g, '_')}.xlsx`;
     try {
       return { buffer: await fs.promises.readFile(filePath), fileName };
@@ -50,7 +50,7 @@ export class EmailBackupService {
     }
   }
 
-  async sendBackupEmail(recipientEmail: string, userId: string): Promise<{ success: boolean; message: string }> {
+  async sendBackupEmail(recipientEmail: string, userId: string, storeId: string): Promise<{ success: boolean; message: string }> {
     if (!this.isConfigured()) {
       throw new BadRequestException('Email backup is not configured on this server');
     }
@@ -61,10 +61,10 @@ export class EmailBackupService {
     }
 
     try {
-      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      const user = await this.prisma.user.findUnique({ where: { id: userId, storeId } });
       if (!user) throw new BadRequestException('User not found');
 
-      const filePath = await this.buildCompleteBackup(user.fullName);
+      const filePath = await this.buildCompleteBackup(user.fullName, storeId);
       const dateStr = new Date().toISOString().slice(0, 10);
 
       const result = await this.transporter!.sendMail({
@@ -94,20 +94,20 @@ export class EmailBackupService {
     }
   }
 
-  private async buildCompleteBackup(userName: string): Promise<string> {
+  private async buildCompleteBackup(userName: string, storeId: string): Promise<string> {
     const workbook = new ExcelJS.Workbook();
 
     // Fetch all data in parallel
     const [products, sales, customers, suppliers, purchases, expenses, shifts, users, settings] = await Promise.all([
-      this.prisma.product.findMany({ include: { variants: true } }),
-      this.prisma.sale.findMany({ include: { items: true, customer: true } }),
-      this.prisma.customer.findMany(),
-      this.prisma.supplier.findMany(),
-      this.prisma.purchaseInvoice.findMany({ include: { items: true, supplier: true } }),
-      this.prisma.expense.findMany(),
-      this.prisma.shift.findMany(),
-      this.prisma.user.findMany({ select: { id: true, username: true, fullName: true, role: true, isActive: true } }),
-      this.prisma.storeSettings.findFirst(),
+      this.prisma.product.findMany({ where: { storeId }, include: { variants: { where: { storeId } } } }),
+      this.prisma.sale.findMany({ where: { storeId }, include: { items: { where: { storeId }, include: { variant: true } }, customer: true } }),
+      this.prisma.customer.findMany({ where: { storeId } }),
+      this.prisma.supplier.findMany({ where: { storeId } }),
+      this.prisma.purchaseInvoice.findMany({ where: { storeId }, include: { items: { where: { storeId }, include: { variant: true } }, supplier: true } }),
+      this.prisma.expense.findMany({ where: { storeId } }),
+      this.prisma.shift.findMany({ where: { storeId } }),
+      this.prisma.user.findMany({ where: { storeId }, select: { id: true, username: true, fullName: true, role: true, isActive: true } }),
+      this.prisma.storeSettings.findFirst({ where: { storeId } }),
     ]);
 
     // Products Sheet

@@ -48,7 +48,7 @@ export class BarcodeLabelTemplatesService {
   async remove(id: string, userId: string, storeId = 'default-store') {
     const row = await this.prisma.barcodeLabelTemplate.findFirst({ where: { id, storeId } });
     if (!row) throw new NotFoundException('قالب الملصق غير موجود');
-    await this.prisma.barcodeLabelTemplate.delete({ where: { id } });
+    await this.prisma.barcodeLabelTemplate.delete({ where: { id, storeId } });
     await this.audit.log(userId, 'BARCODE_LABEL_TEMPLATE_DELETED', 'BarcodeLabelTemplate', id, { name: row.name });
     return { message: 'تم حذف قالب الملصق' };
   }

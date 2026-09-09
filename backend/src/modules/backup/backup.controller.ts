@@ -23,7 +23,7 @@ export class BackupController {
     if (!user?.telegramChatId) {
       return { message: 'يجب ربط حساب تليغرام أولاً من صفحة الإعدادات' };
     }
-    await this.backupService.backupForUser(user.id, user.telegramChatId, user.fullName);
+    await this.backupService.backupForUser(user.id, user.telegramChatId, user.fullName, actor.storeId);
     return { message: 'تم إرسال النسخة الاحتياطية إلى تليغرام' };
   }
 }

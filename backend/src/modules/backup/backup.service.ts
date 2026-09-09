@@ -30,7 +30,7 @@ export class BackupService {
 
     for (const user of users) {
       try {
-        await this.backupForUser(user.id, user.telegramChatId!, user.fullName);
+        await this.backupForUser(user.id, user.telegramChatId!, user.fullName, user.storeId);
       } catch (err) {
         this.logger.error(`فشل النسخ الاحتياطي للمستخدم ${user.username}: ${err}`);
       }
@@ -38,7 +38,7 @@ export class BackupService {
   }
 
   /** يبني نسخة اليوم لمستخدم واحد ويرسلها فقط إلى محادثته الخاصة (خصوصية كاملة) */
-  async backupForUser(userId: string, chatId: string, fullName: string) {
+  async backupForUser(userId: string, chatId: string, fullName: string, storeId: string) {
     const dayStart = new Date();
     dayStart.setHours(0, 0, 0, 0);
     const dayEnd = new Date();
@@ -46,11 +46,11 @@ export class BackupService {
 
     const [sales, expenses] = await Promise.all([
       this.prisma.sale.findMany({
-        where: { userId, createdAt: { gte: dayStart, lte: dayEnd } },
+        where: { userId, storeId, createdAt: { gte: dayStart, lte: dayEnd } },
         include: { items: { include: { variant: { include: { product: true } } } } },
       }),
       this.prisma.expense.findMany({
-        where: { userId, createdAt: { gte: dayStart, lte: dayEnd } },
+        where: { userId, storeId, createdAt: { gte: dayStart, lte: dayEnd } },
       }),
     ]);
 

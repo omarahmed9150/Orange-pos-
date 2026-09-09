@@ -7,8 +7,10 @@ export class AuditService {
 
   /** يسجل عملية حساسة مع من نفّذها ومتى (لا يمكن حذف هذه السجلات من أي واجهة) */
   async log(userId: string, action: string, entityType: string, entityId?: string, details?: unknown) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { storeId: true } });
     await this.prisma.auditLog.create({
       data: {
+        storeId: user?.storeId ?? 'default-store',
         userId,
         action,
         entityType,
@@ -18,9 +20,10 @@ export class AuditService {
     });
   }
 
-  findAll(filters: { entityType?: string; userId?: string }) {
+  findAll(filters: { entityType?: string; userId?: string; storeId: string }) {
     return this.prisma.auditLog.findMany({
       where: {
+        storeId: filters.storeId,
         entityType: filters.entityType,
         userId: filters.userId,
       },

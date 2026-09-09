@@ -11,15 +11,15 @@ export class ExpensesService {
     private readonly audit: AuditService,
   ) {}
 
-  async create(dto: CreateExpenseDto, userId: string) {
+  async create(dto: CreateExpenseDto, userId: string, storeId: string) {
     if (dto.shiftId) {
-      const shift = await this.prisma.shift.findUnique({ where: { id: dto.shiftId } });
+      const shift = await this.prisma.shift.findFirst({ where: { id: dto.shiftId, storeId } });
       if (!shift) throw new NotFoundException('الوردية غير موجودة');
       if (shift.cashierId !== userId) throw new BadRequestException('لا يمكن إضافة مصروف لوردية مستخدم آخر');
       if (shift.status !== 'OPEN') throw new BadRequestException('لا يمكن إضافة مصروف لوردية مغلقة');
     }
     const expense = await this.prisma.expense.create({
-      data: { ...dto, userId },
+      data: { ...dto, userId, storeId },
     });
     await this.audit.log(userId, 'EXPENSE_ADDED', 'Expense', expense.id, {
       title: expense.title,
@@ -29,10 +29,10 @@ export class ExpensesService {
   }
 
   /** عزل البيانات: الكاشير يرى مصاريفه فقط، الإدارة ترى الكل */
-  findAll(requester: { userId: string; role: UserRole }) {
+  findAll(requester: { userId: string; role: UserRole; storeId: string }) {
     const isPrivileged = requester.role !== UserRole.CASHIER;
     return this.prisma.expense.findMany({
-      where: isPrivileged ? {} : { userId: requester.userId },
+      where: isPrivileged ? { storeId: requester.storeId } : { storeId: requester.storeId, userId: requester.userId },
       orderBy: { createdAt: 'desc' },
     });
   }
