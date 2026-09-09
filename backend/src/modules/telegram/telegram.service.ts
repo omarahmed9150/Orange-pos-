@@ -21,37 +21,47 @@ export class TelegramService implements OnModuleInit {
       return;
     }
 
-    // Polling محلي (لا يحتاج سيرفر عام/Webhook) - مناسب لتطبيق سطح مكتب يعمل محلياً
-    this.bot = new TelegramBot(token, { polling: true });
-
-    this.bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
-      const chatId = msg.chat.id.toString();
-      const linkToken = match?.[1]?.trim();
-
-      if (!linkToken) {
-        await this.bot!.sendMessage(chatId, 'مرحباً بك في بوت ORANGE. يرجى استخدام رابط الربط من داخل التطبيق.');
-        return;
+    try {
+      if (!this.bot) {
+        this.bot = new TelegramBot(token, { polling: true });
       }
 
-      const user = await this.prisma.user.findUnique({ where: { telegramLinkToken: linkToken } });
-      if (!user) {
-        await this.bot!.sendMessage(chatId, 'رابط الربط غير صالح أو منتهي الصلاحية.');
-        return;
-      }
-
-      await this.storeSettings.setTelegramChatId(user.storeId, chatId);
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: { telegramLinkToken: null },
+      // معالجة أخطاء الـ Polling لمنع توقف الخدمة على Vercel
+      this.bot.on('polling_error', (error) => {
+        this.logger.error(`Telegram Polling Error: ${error.message}`);
       });
 
-      await this.bot!.sendMessage(
-        chatId,
-        `✅ تم ربط حسابك بنجاح، ${user.fullName}.\nستصلك نسخة احتياطية بفواتيرك ومصاريفك تلقائياً كل يوم الساعة 00:00.`,
-      );
-    });
+      this.bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
+        const chatId = msg.chat.id.toString();
+        const linkToken = match?.[1]?.trim();
 
-    this.logger.log('بوت تليغرام يعمل الآن (Polling).');
+        if (!linkToken) {
+          await this.bot!.sendMessage(chatId, 'مرحباً بك في بوت ORANGE. يرجى استخدام رابط الربط من داخل التطبيق.');
+          return;
+        }
+
+        const user = await this.prisma.user.findUnique({ where: { telegramLinkToken: linkToken } });
+        if (!user) {
+          await this.bot!.sendMessage(chatId, 'رابط الربط غير صالح أو منتهي الصلاحية.');
+          return;
+        }
+
+        await this.storeSettings.setTelegramChatId(user.storeId, chatId);
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: { telegramLinkToken: null },
+        });
+
+        await this.bot!.sendMessage(
+          chatId,
+          `✅ تم ربط حسابك بنجاح، ${user.fullName}.\nستصلك نسخة احتياطية بفواتيرك ومصاريفك تلقائياً كل يوم الساعة 00:00.`,
+        );
+      });
+
+      this.logger.log('بوت تليغرام يعمل الآن.');
+    } catch (error: any) {
+      this.logger.error(`فشل إعداد بوت تليغرام: ${error?.message}`);
+    }
   }
 
   /** يولّد توكن ربط مؤقت ورابط Deep Link خاص بالمستخدم */
@@ -70,23 +80,31 @@ export class TelegramService implements OnModuleInit {
     await this.prisma.user.update({ where: { id: userId }, data: { telegramChatId: null } });
   }
 
-  isConfigured() {
-    return !!this.bot;
+  /** التحقق من تفعيل التليجرام عبر متغير البيئة أو الكائن */
+  isConfigured(): boolean {
+    return !!process.env.TELEGRAM_BOT_TOKEN || !!this.bot;
   }
 
   async verifyToken(token: string) {
     if (!token?.trim()) return { connected: false, message: 'توكن Telegram مطلوب' };
-    const response = await fetch(`https://api.telegram.org/bot${encodeURIComponent(token.trim())}/getMe`);
-    const payload = await response.json() as { ok?: boolean; result?: { username?: string } };
-    if (!response.ok || !payload.ok) {
-      return { connected: false, message: 'توكن Telegram غير صالح' };
+    try {
+      const response = await fetch(`https://api.telegram.org/bot${encodeURIComponent(token.trim())}/getMe`);
+      const payload = (await response.json()) as { ok?: boolean; result?: { username?: string } };
+      if (!response.ok || !payload.ok) {
+        return { connected: false, message: 'توكن Telegram غير صالح' };
+      }
+      return { connected: true, username: payload.result?.username ?? null, message: 'متصل ✓' };
+    } catch {
+      return { connected: false, message: 'تعذر الاتصال بخوادم Telegram' };
     }
-    return { connected: true, username: payload.result?.username ?? null, message: 'متصل ✓' };
   }
 
-  /** إرسال ملف (Excel/PDF) إلى محادثة المستخدم الخاصة فقط - لا يشارك بيانات أي مستخدم آخر */
+  /** إرسال ملف (Excel/PDF) إلى محادثة المستخدم الخاصة */
   async sendDocumentToUser(chatId: string, filePath: string, caption: string) {
-    if (!this.bot) return;
-    await this.bot.sendDocument(chatId, filePath, { caption });
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token && !this.bot) return;
+
+    const botInstance = this.bot || new TelegramBot(token!, { polling: false });
+    await botInstance.sendDocument(chatId, filePath, { caption });
   }
 }
