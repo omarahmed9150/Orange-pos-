@@ -2,6 +2,9 @@
   "installCommand": "npm install --include=dev",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "env": {
+    "NPM_CONFIG_PRODUCTION": "false"
+  },
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
