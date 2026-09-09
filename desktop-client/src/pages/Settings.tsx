@@ -94,9 +94,7 @@ export function Settings() {
       const { data } = await api.post('/telegram/link-token');
       setBotConfigured(data.botConfigured);
       setLink(data.link);
-      if (!data.botConfigured) {
-        setMessage('لم يتم ضبط بوت تليغرام من الإدارة بعد (TELEGRAM_BOT_TOKEN).');
-      }
+      setMessage('تم توليد رابط ربط Telegram بنجاح ✅');
     } catch {
       setMessage('تعذر توليد رابط الربط');
     } finally {

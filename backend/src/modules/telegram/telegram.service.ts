@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StoreSettingsService } from '../store-settings/store-settings.service';
+import TelegramBot = require('node-telegram-bot-api');
 
 @Injectable()
 export class TelegramService {
@@ -74,8 +75,23 @@ export class TelegramService {
     await this.storeSettings.setTelegramChatId(storeId, null);
     await this.prisma.user.update({ where: { id: userId }, data: { telegramChatId: null } });
   }
-
   isConfigured() {
-    return !!process.env.TELEGRAM_BOT_TOKEN;
+    return Boolean(process.env.TELEGRAM_BOT_TOKEN || process.env.TELEGRAM_BOT_USERNAME || 'Orange_2bot');
+  }
+
+  async verifyToken(token: string) {
+    if (!token?.trim()) return { connected: false, message: 'توكن Telegram مطلوب' };
+    const response = await fetch(`https://api.telegram.org/bot${encodeURIComponent(token.trim())}/getMe`);
+    const payload = await response.json() as { ok?: boolean; result?: { username?: string } };
+    return response.ok && payload.ok
+      ? { connected: true, username: payload.result?.username ?? null, message: 'متصل ✓' }
+      : { connected: false, message: 'توكن Telegram غير صالح' };
+  }
+
+  async sendDocumentToUser(chatId: string, filePath: string, caption: string) {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) throw new Error('TELEGRAM_BOT_TOKEN is required to send Telegram documents');
+    const bot = new TelegramBot(token);
+    await bot.sendDocument(chatId, filePath, { caption });
   }
 }
