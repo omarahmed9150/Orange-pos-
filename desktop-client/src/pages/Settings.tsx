@@ -94,6 +94,7 @@ export function Settings() {
       const { data } = await api.post('/telegram/link-token');
       setBotConfigured(data.botConfigured);
       setLink(data.link);
+       window.open(data.link, '_blank', 'noopener,noreferrer');
       setMessage('تم توليد رابط ربط Telegram بنجاح ✅');
     } catch {
       setMessage('تعذر توليد رابط الربط');
@@ -405,7 +406,7 @@ export function Settings() {
         ) : botConfigured ? (
           <div className="space-y-2">
             <a href={link} target="_blank" rel="noreferrer" className="block text-center bg-blue-500 text-white rounded-lg py-2 font-semibold">
-              فتح بوت تليغرام والضغط على Start
+              فتح Telegram للربط ↗
             </a>
             <button onClick={unlink} className="w-full bg-gray-100 rounded-lg py-2 text-sm">
               إلغاء الربط الحالي

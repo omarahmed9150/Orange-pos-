@@ -319,7 +319,7 @@ export class SalesService {
 
     // تحقق توفر مخزون الأصناف الجديدة
     const newVariantIds = dto.newItems.map((i) => i.variantId);
-    const newVariants = await this.prisma.variant.findMany({ where: { id: { in: newVariantIds }, ...(actor.storeId ? { storeId: actor.storeId, product: { storeId: actor.storeId } } : {}) } });
+    const newVariants = await this.prisma.variant.findMany({ where: { id: { in: newVariantIds }, storeId: actor.storeId, product: { storeId: actor.storeId } } });
     if (newVariants.length !== newVariantIds.length) {
       throw new NotFoundException('صنف بديل غير موجود');
     }

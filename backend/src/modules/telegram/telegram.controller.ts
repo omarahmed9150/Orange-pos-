@@ -19,7 +19,7 @@ export class TelegramController {
   @Post('link-token')
   @ApiOperation({ summary: 'توليد رابط ربط تليغرام (Deep Link) خاص بالمستخدم الحالي' })
   async createLink(@CurrentUser() user: AuthenticatedUser) {
-    const result = await this.telegram.generateLinkToken(user.userId);
+    const result = await this.telegram.generateLinkToken(user.userId, user.storeId);
     const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'Orange_2bot';
     const link = result.link || `https://t.me/${encodeURIComponent(botUsername)}?start=${encodeURIComponent(result.token)}`;
 

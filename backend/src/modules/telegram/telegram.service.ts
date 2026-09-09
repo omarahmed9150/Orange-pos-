@@ -61,9 +61,9 @@ export class TelegramService {
   }
 
   /** يولّد توكن ربط مؤقت ورابط Deep Link خاص بالمستخدم */
-  async generateLinkToken(userId: string) {
+  async generateLinkToken(userId: string, storeId: string) {
     const token = crypto.randomBytes(16).toString('hex');
-    await this.prisma.user.update({ where: { id: userId }, data: { telegramLinkToken: token } });
+    await this.prisma.user.update({ where: { id: userId, storeId }, data: { telegramLinkToken: token } });
 
     const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'Orange_2bot';
     const link = `https://t.me/${encodeURIComponent(botUsername)}?start=${encodeURIComponent(token)}`;

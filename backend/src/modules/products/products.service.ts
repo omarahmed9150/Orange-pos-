@@ -131,7 +131,8 @@ export class ProductsService {
         await tx.stockMovement.create({
           data: {
             variantId,
-            userId,
+            storeId,
+             userId,
             type: StockMovementType.MANUAL_ADJUSTMENT,
             quantity: dto.stockQuantity - variant.stockQuantity,
             reason: 'تعديل سريع من شاشة المنتجات',
