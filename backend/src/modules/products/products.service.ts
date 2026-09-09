@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -35,8 +35,19 @@ export class ProductsService {
     private readonly audit: AuditService,
   ) {}
 
-  create(dto: CreateProductDto, storeId: string) {
+  /**
+   * حارس عزل صارم بين المتاجر: يرفض أي طلب بدون storeId صالح للمستخدم الحالي فوراً.
+   * لا يوجد أي استثناء لأي دور (لا SUPER_ADMIN ولا ADMIN) - العزل بين المتاجر مطلق دائماً.
+   */
+  private ensureStore(storeId: string): void {
+    if (!storeId) {
+      throw new UnauthorizedException('لا يوجد معرف متجر صالح لهذا المستخدم - تم رفض الطلب');
+    }
     assertStoreId(storeId);
+  }
+
+  create(dto: CreateProductDto, storeId: string) {
+    this.ensureStore(storeId);
     return this.prisma.product.create({
       data: {
         storeId,
@@ -58,7 +69,7 @@ export class ProductsService {
   }
 
   async updateImage(id: string, imageUrl: string | null, storeId: string) {
-    assertStoreId(storeId);
+    this.ensureStore(storeId);
     const product = await this.prisma.product.findFirst({ where: { id, storeId } });
     if (!product) throw new NotFoundException(`Product ${id} not found`);
 
@@ -70,7 +81,7 @@ export class ProductsService {
   }
 
   async update(id: string, dto: UpdateProductDto, userId: string, storeId: string) {
-    assertStoreId(storeId);
+    this.ensureStore(storeId);
     const product = await this.prisma.product.findFirst({
       where: { id, storeId },
       include: { variants: { where: { storeId }, take: 1 } },
@@ -105,7 +116,7 @@ export class ProductsService {
   }
 
   async remove(id: string, userId: string, storeId: string) {
-    assertStoreId(storeId);
+    this.ensureStore(storeId);
     const product = await this.prisma.product.findFirst({ where: { id, storeId } });
     if (!product) throw new NotFoundException(`Product ${id} not found`);
     await this.prisma.product.delete({ where: { id, storeId } });
@@ -114,7 +125,7 @@ export class ProductsService {
   }
 
   async quickUpdateVariant(variantId: string, dto: QuickUpdateVariantDto, userId: string, storeId: string) {
-    assertStoreId(storeId);
+    this.ensureStore(storeId);
     if (dto.sellingPrice === undefined && dto.stockQuantity === undefined) {
       throw new NotFoundException('لم يتم إرسال أي قيمة للتعديل');
     }
@@ -157,7 +168,7 @@ export class ProductsService {
   }
 
   findAll(storeId: string) {
-    assertStoreId(storeId);
+    this.ensureStore(storeId);
     return this.prisma.product.findMany({
       where: { storeId },
       include: { variants: { where: { storeId } } },
@@ -166,7 +177,7 @@ export class ProductsService {
   }
 
   search(query: string, storeId: string) {
-    assertStoreId(storeId);
+    this.ensureStore(storeId);
     const term = query.trim();
     if (!term) {
       return this.findAll(storeId);
@@ -199,7 +210,7 @@ export class ProductsService {
   }
 
   async findOne(id: string, storeId: string) {
-    assertStoreId(storeId);
+    this.ensureStore(storeId);
     const product = await this.prisma.product.findUnique({
       where: { id, storeId },
       include: { variants: { where: { storeId } } },
@@ -213,7 +224,7 @@ export class ProductsService {
   }
 
   async findByBarcode(barcode: string, storeId: string) {
-    assertStoreId(storeId);
+    this.ensureStore(storeId);
     const variant = await this.prisma.variant.findFirst({
       where: { barcode, storeId, product: { storeId } },
       include: { product: true },
@@ -227,7 +238,7 @@ export class ProductsService {
   }
 
   async findBySku(sku: string, storeId: string) {
-    assertStoreId(storeId);
+    this.ensureStore(storeId);
     const variant = await this.prisma.variant.findFirst({
       where: { sku, storeId, product: { storeId } },
       include: { product: true },
@@ -245,7 +256,7 @@ export class ProductsService {
    * لا يتقاطع مع صيغة باركود الميزان الإلكتروني (13 رقماً تبدأ بـ 2) المُستخدَمة بشاشة البيع.
    */
   async generateUniqueBarcode(storeId: string): Promise<string> {
-    assertStoreId(storeId);
+    this.ensureStore(storeId);
     for (let attempt = 0; attempt < 20; attempt++) {
       const randomDigits = Array.from({ length: 11 }, () => Math.floor(Math.random() * 10)).join('');
       const candidate = `9${randomDigits}`;
@@ -276,7 +287,7 @@ export class ProductsService {
    * يتخطى أي صف SKU مكرر موجود أصلاً بقاعدة البيانات، ويجمع كل الأخطاء بدل التوقف عند أول خطأ.
    */
   async importFromExcel(buffer: Buffer, userId: string, storeId: string) {
-    assertStoreId(storeId);
+    this.ensureStore(storeId);
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(buffer as any);
     const sheet = workbook.worksheets[0];

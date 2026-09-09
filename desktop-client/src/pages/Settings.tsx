@@ -164,8 +164,12 @@ export function Settings() {
 
   async function testBackupNow() {
     setMessage('');
-    const { data } = await api.post('/backup/run-now');
-    setMessage(data.message);
+    try {
+      const { data } = await api.post('/backup/run-now');
+      setMessage(data.message);
+    } catch (err: any) {
+      setMessage(err?.response?.data?.message || err?.message || 'تعذر إرسال النسخة الاحتياطية الآن');
+    }
   }
 
   async function verifyTelegramToken() {
@@ -397,8 +401,8 @@ export function Settings() {
               />
             </div>
 
-            <button 
-              onClick={sendEmailBackup} 
+            <button
+              onClick={sendEmailBackup}
               disabled={emailBackupLoading || !emailBackupEmail.trim()}
               className="bg-blue-600 text-white rounded-lg px-4 py-2 font-semibold disabled:opacity-50"
             >
