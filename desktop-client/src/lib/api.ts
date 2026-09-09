@@ -21,6 +21,15 @@ api.interceptors.response.use(
   (res) => res,
   (error) => {
     if (error?.response?.status === 401) {
+      const isTelegramRequest = String(error?.config?.url || '').includes('/telegram');
+      if (isTelegramRequest) {
+        const message = 'حسابك غير مرتبط بمتجر، يرجى التواصل مع الدعم';
+        window.dispatchEvent(new CustomEvent('api-error', { detail: { message } }));
+        if (error.response) {
+          error.response.data = { ...(error.response.data || {}), message };
+        }
+        return Promise.reject(error);
+      }
       clearAuthSession();
       window.location.href = '/login';
     }

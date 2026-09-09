@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { UserRole } from '@prisma/client';
+import { User, UserRole } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
@@ -18,7 +18,7 @@ export class AuthService {
   ) {}
 
   async login(dto: LoginDto) {
-    const user = await this.prisma.user.findUnique({ where: { username: dto.username } });
+    let user = await this.prisma.user.findUnique({ where: { username: dto.username } });
 
     // رسالة موحدة لعدم كشف إن كان اسم المستخدم صحيحاً أم لا
     const invalidCredentials = () =>
@@ -30,6 +30,7 @@ export class AuthService {
     const passwordOk = await bcrypt.compare(dto.password, user.passwordHash);
     if (!passwordOk) throw invalidCredentials();
 
+    user = await this.ensureStoreAssignment(user);
     const payload = { sub: user.id, username: user.username, role: user.role, storeId: user.storeId };
     const accessToken = await this.jwt.signAsync(payload);
 
@@ -117,7 +118,7 @@ export class AuthService {
 
   /** تبديل سريع لمستخدم آخر عبر اسم المستخدم + PIN (بدون كلمة السر الكاملة) - لتبديل الكاشير بسرعة على نفس الجهاز */
   async quickSwitch(dto: QuickSwitchDto) {
-    const user = await this.prisma.user.findUnique({ where: { username: dto.username } });
+    let user = await this.prisma.user.findUnique({ where: { username: dto.username } });
 
     const invalid = () => new UnauthorizedException('اسم المستخدم أو PIN غير صحيح');
 
@@ -128,6 +129,7 @@ export class AuthService {
     const pinOk = await bcrypt.compare(dto.pin, user.pinHash);
     if (!pinOk) throw invalid();
 
+    user = await this.ensureStoreAssignment(user);
     const payload = { sub: user.id, username: user.username, role: user.role, storeId: user.storeId };
     const accessToken = await this.jwt.signAsync(payload);
 
@@ -141,5 +143,25 @@ export class AuthService {
         storeId: user.storeId,
       },
     };
+  }
+
+  private async ensureStoreAssignment(user: User): Promise<User> {
+    if (user.storeId && user.storeId !== 'null' && user.storeId !== 'undefined') {
+      return user;
+    }
+
+    const storeId = randomUUID();
+    return this.prisma.$transaction(async (tx) => {
+      await tx.store.create({
+        data: {
+          id: storeId,
+          name: `${user.fullName || user.username} - متجر`,
+        },
+      });
+      return tx.user.update({
+        where: { id: user.id },
+        data: { storeId },
+      });
+    });
   }
 }

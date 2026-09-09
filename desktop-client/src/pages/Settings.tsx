@@ -37,10 +37,16 @@ export function Settings() {
   const [telegramStatus, setTelegramStatus] = useState('');
 
   useEffect(() => {
+    const onApiError = (event: Event) => {
+      const message = (event as CustomEvent<{ message?: string }>).detail?.message;
+      if (message) setMessage(message);
+    };
+    window.addEventListener('api-error', onApiError);
     api.get('/store-settings').then(({ data }) => setStoreSettings(data));
     loadDbBackupStatus();
     api.get('/license/status').then(({ data }) => setLicenseStatus(data));
     api.get('/backup/email/status').then(({ data }) => setEmailBackupConfigured(data.configured)).catch(() => setEmailBackupConfigured(false));
+    return () => window.removeEventListener('api-error', onApiError);
   }, []);
 
   async function loadDbBackupStatus() {
@@ -97,8 +103,8 @@ export function Settings() {
       setLink(data.link);
        window.open(data.link, '_blank', 'noopener,noreferrer');
       setMessage('تم توليد رابط ربط Telegram بنجاح ✅');
-    } catch {
-      setMessage('تعذر توليد رابط الربط');
+    } catch (err: any) {
+      setMessage(err?.response?.data?.message || 'تعذر توليد رابط الربط');
     } finally {
       setLoading(false);
     }
