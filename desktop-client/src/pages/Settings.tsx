@@ -27,7 +27,7 @@ export function Settings() {
   const [pinCurrentPassword, setPinCurrentPassword] = useState('');
   const [pinValue, setPinValue] = useState('');
   const [pinMessage, setPinMessage] = useState('');
-  const [licenseStatus, setLicenseStatus] = useState<{ activated: boolean; activatedAt: string | null } | null>(null);
+  const [licenseStatus, setLicenseStatus] = useState<{ isLicensed: boolean; activated: boolean; message: string; activatedAt: string | null } | null>(null);
   const [emailBackupConfigured, setEmailBackupConfigured] = useState(false);
   const [emailBackupEmail, setEmailBackupEmail] = useState('');
   const [emailBackupLoading, setEmailBackupLoading] = useState(false);
@@ -425,12 +425,12 @@ export function Settings() {
       {licenseStatus && (
         <div className="bg-white rounded-2xl shadow p-6 space-y-1">
           <h2 className="font-bold">🔑 حالة الترخيص</h2>
-          {licenseStatus.activated ? (
+          {licenseStatus.isLicensed ? (
             <p className="text-sm text-emerald-600">
-              مفعّل {licenseStatus.activatedAt && `منذ ${new Date(licenseStatus.activatedAt).toLocaleDateString('ar-EG')}`}
+              مفعل ✅ {licenseStatus.activatedAt && `منذ ${new Date(licenseStatus.activatedAt).toLocaleDateString('ar-EG')}`}
             </p>
           ) : (
-            <p className="text-sm text-red-600">غير مفعّل</p>
+            <p className="text-sm text-red-600">{licenseStatus.message || 'غير مفعل'}</p>
           )}
         </div>
       )}

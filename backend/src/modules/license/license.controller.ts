@@ -1,8 +1,8 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Public } from '../../common/decorators/public.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
+import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { LicenseService } from './license.service';
 import { ActivateLicenseDto } from './dto/activate-license.dto';
 
@@ -11,17 +11,16 @@ import { ActivateLicenseDto } from './dto/activate-license.dto';
 export class LicenseController {
   constructor(private readonly licenseService: LicenseService) {}
 
-  @Public()
   @Get('status')
   @ApiOperation({ summary: 'حالة تفعيل الترخيص (طبقة تحقق مرتبطة بقاعدة البيانات)' })
-  getStatus() {
-    return this.licenseService.getStatus();
+  getStatus(@CurrentUser() user: AuthenticatedUser) {
+    return this.licenseService.getStatus(user.storeId);
   }
 
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   @Post('activate')
   @ApiOperation({ summary: 'تفعيل الترخيص برمز صالح' })
-  activate(@Body() dto: ActivateLicenseDto) {
-    return this.licenseService.activate(dto.licenseKey);
+  activate(@Body() dto: ActivateLicenseDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.licenseService.activate(user.storeId, dto.licenseKey);
   }
 }

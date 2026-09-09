@@ -36,10 +36,10 @@ export class StoreSettingsService {
   }
 
   /** تحديث بيانات الترخيص فقط - داخلي، يُستخدم من LicenseModule حصراً وليس من واجهة الإعدادات العامة */
-  async setLicense(licenseKey: string) {
-    await this.get();
+  async setLicense(storeId: string, licenseKey: string) {
+    await this.get(storeId);
     return this.prisma.storeSettings.update({
-      where: { id: SINGLETON_ID },
+      where: { id: settingsId(storeId) },
       data: { licenseKey, licenseActivatedAt: new Date() },
     });
   }

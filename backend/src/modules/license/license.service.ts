@@ -26,20 +26,23 @@ export class LicenseService {
    * حالة الترخيص من قاعدة البيانات نفسها - طبقة تحقق مكمّلة لملف الترخيص المحلي بجهاز Electron
    * (أصعب على المستخدم تجاوزها بحذف ملف واحد، لأنها مرتبطة بنفس قاعدة بيانات العمل).
    */
-  async getStatus() {
-    const settings = await this.storeSettings.get();
+  async getStatus(storeId: string) {
+    const settings = await this.storeSettings.get(storeId);
+    const isLicensed = !!settings.licenseKey && isValidLicenseFormat(settings.licenseKey);
     return {
-      activated: !!settings.licenseKey && isValidLicenseFormat(settings.licenseKey),
+      isLicensed,
+      activated: isLicensed,
+      message: isLicensed ? 'مفعل' : 'غير مفعل',
       activatedAt: settings.licenseActivatedAt,
     };
   }
 
-  async activate(licenseKey: string) {
+  async activate(storeId: string, licenseKey: string) {
     if (!isValidLicenseFormat(licenseKey)) {
       throw new BadRequestException('رمز التفعيل غير صحيح');
     }
 
-    await this.storeSettings.setLicense(licenseKey.trim().toUpperCase());
+    await this.storeSettings.setLicense(storeId, licenseKey.trim().toUpperCase());
 
     return { success: true, message: 'تم تفعيل الترخيص بنجاح' };
   }
