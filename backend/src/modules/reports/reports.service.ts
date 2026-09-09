@@ -5,6 +5,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { PrismaService } from '../../prisma/prisma.service';
+import { assertStoreId } from '../../common/security/store-scope';
 
 interface DateRange {
   from?: Date;
@@ -32,7 +33,7 @@ export class ReportsService {
 
   /** فصل مالي دقيق: Revenue, COGS, Gross Profit, Expenses, Net Profit */
   async financialSummary(from?: string, to?: string, storeId?: string) {
-    if (!storeId) throw new BadRequestException('المتجر غير محدد');
+    assertStoreId(storeId);
     const { from: gte, to: lte } = this.range(from, to);
 
     const sales = await this.prisma.sale.findMany({
@@ -70,7 +71,7 @@ export class ReportsService {
 
   /** المنتجات الأكثر مبيعاً (حسب الكمية المباعة الصافية) */
   async topProducts(from?: string, to?: string, limit = 10, storeId?: string) {
-    if (!storeId) throw new BadRequestException('المتجر غير محدد');
+    assertStoreId(storeId);
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
       throw new BadRequestException('حد التقرير يجب أن يكون بين 1 و100');
     }
@@ -97,7 +98,7 @@ export class ReportsService {
 
   /** الأصناف الراكدة: أصناف لم تُبع إطلاقاً خلال الفترة رغم وجود مخزون */
   async slowMovingProducts(from?: string, to?: string, storeId?: string) {
-    if (!storeId) throw new BadRequestException('المتجر غير محدد');
+    assertStoreId(storeId);
     const { from: gte, to: lte } = this.range(from, to);
 
     const soldVariantIds = new Set(
@@ -121,7 +122,7 @@ export class ReportsService {
 
   /** أداء الموظفين: عدد الفواتير وإجمالي المبيعات لكل موظف */
   async employeePerformance(from?: string, to?: string, storeId?: string) {
-    if (!storeId) throw new BadRequestException('المتجر غير محدد');
+    assertStoreId(storeId);
     const { from: gte, to: lte } = this.range(from, to);
 
     const sales = await this.prisma.sale.findMany({
@@ -142,7 +143,7 @@ export class ReportsService {
 
   /** اتجاه المبيعات اليومي لآخر N يوم (كل الورديات وكل المستخدمين) - لرسم بياني بلوحة التحكم */
   async salesTrend(days = 7, storeId?: string) {
-    if (!storeId) throw new BadRequestException('المتجر غير محدد');
+    assertStoreId(storeId);
     if (!Number.isInteger(days) || days < 1 || days > 366) {
       throw new BadRequestException('عدد الأيام يجب أن يكون بين 1 و366');
     }
@@ -173,6 +174,7 @@ export class ReportsService {
 
   /** يبني ملف Excel كامل (ملخص مالي + الأكثر مبيعاً + الراكد + أداء الموظفين) ويرجّع مسار الملف المؤقت */
   async exportToExcel(from?: string, to?: string, storeId?: string) {
+    assertStoreId(storeId);
     const [summary, top, slow, employees] = await Promise.all([
       this.financialSummary(from, to, storeId),
       this.topProducts(from, to, 20, storeId),

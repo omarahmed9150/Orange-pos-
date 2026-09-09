@@ -8,6 +8,7 @@ export interface AuthUser {
   username: string;
   fullName: string;
   role: UserRole;
+  storeId: string;
 }
 
 interface AuthContextValue {
@@ -35,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data } = await api.post('/auth/login', { username, password });
     localStorage.setItem('orange_token', data.accessToken);
     localStorage.setItem('orange_user', JSON.stringify(data.user));
+    localStorage.setItem('orange_store_id', data.user.storeId);
     setUser(data.user);
     setLocked(false);
   }
@@ -65,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data } = await api.post('/auth/quick-switch', { username, pin });
     localStorage.setItem('orange_token', data.accessToken);
     localStorage.setItem('orange_user', JSON.stringify(data.user));
+    localStorage.setItem('orange_store_id', data.user.storeId);
     setUser(data.user);
     setLocked(false);
   }

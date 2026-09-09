@@ -10,6 +10,7 @@ import { CreateSaleDto } from './dto/create-sale.dto';
 import { PriceTier } from './dto/create-sale.dto';
 import { RefundSaleDto } from './dto/refund-sale.dto';
 import { ExchangeSaleDto } from './dto/exchange-sale.dto';
+import { assertStoreId } from '../../common/security/store-scope';
 
 /** يحدد السعر الفعلي للصنف بحسب مستوى السعر المختار، مع رجوع تلقائي لسعر المفرد إن لم يوجد سعر جملة/VIP */
 function resolvePrice(variant: { sellingPrice: number; wholesalePrice: number | null; vipPrice: number | null }, tier?: PriceTier, overridePrice?: number) {
@@ -26,7 +27,8 @@ export class SalesService {
     private readonly audit: AuditService,
   ) {}
 
-  async create(dto: CreateSaleDto, userId: string, storeId = 'default-store') {
+  async create(dto: CreateSaleDto, userId: string, storeId: string) {
+    assertStoreId(storeId);
     if (!dto.items.length) {
       throw new BadRequestException('Sale must contain at least one item');
     }
@@ -151,27 +153,29 @@ export class SalesService {
    * عزل البيانات: الكاشير يرى فواتيره فقط.
    * الأدوار الإدارية (Admin/Manager/SuperAdmin) ترى كل الفواتير.
    */
-  findByShift(shiftId: string, requester: { userId: string; role: UserRole; storeId?: string }) {
+  findByShift(shiftId: string, requester: { userId: string; role: UserRole; storeId: string }) {
+    assertStoreId(requester.storeId);
     const isPrivileged = requester.role !== UserRole.CASHIER;
     return this.prisma.sale.findMany({
       where: {
         shiftId,
-        ...(requester.storeId ? { storeId: requester.storeId } : {}),
+        storeId: requester.storeId,
         ...(isPrivileged ? {} : { userId: requester.userId }),
       },
       include: {
-        items: { where: { ...(requester.storeId ? { storeId: requester.storeId } : {}) }, include: { variant: { include: { product: true } } } },
+        items: { where: { storeId: requester.storeId }, include: { variant: { include: { product: true } } } },
         user: { select: { fullName: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  async findOne(id: string, requester: { userId: string; role: UserRole; storeId?: string }) {
+  async findOne(id: string, requester: { userId: string; role: UserRole; storeId: string }) {
+    assertStoreId(requester.storeId);
     const sale = await this.prisma.sale.findUnique({
-      where: { id, ...(requester.storeId ? { storeId: requester.storeId } : {}) },
+      where: { id, storeId: requester.storeId },
       include: {
-        items: { where: { ...(requester.storeId ? { storeId: requester.storeId } : {}) }, include: { variant: { include: { product: true } } } },
+        items: { where: { storeId: requester.storeId }, include: { variant: { include: { product: true } } } },
       },
     });
 
@@ -188,9 +192,10 @@ export class SalesService {
   }
 
   /** استرجاع كامل أو جزئي مع منع تكرار الاسترجاع وإعادة الكمية للمخزون */
-  async refund(id: string, dto: RefundSaleDto, actor: { userId: string; username: string; storeId?: string }) {
+  async refund(id: string, dto: RefundSaleDto, actor: { userId: string; username: string; storeId: string }) {
+    assertStoreId(actor.storeId);
     const sale = await this.prisma.sale.findUnique({
-      where: { id, ...(actor.storeId ? { storeId: actor.storeId } : {}) },
+      where: { id, storeId: actor.storeId },
       include: { items: { where: { storeId: actor.storeId } } },
     });
 
@@ -277,15 +282,16 @@ export class SalesService {
    * الاستبدال: يرجّع أصنافاً من فاتورة أصلية ويستبدلها بأصناف جديدة في فاتورة منفصلة،
    * مع حساب فرق السعر تلقائياً (المبلغ المطلوب من الزبون أو المبلغ الواجب إرجاعه له).
    */
-  async exchange(id: string, dto: ExchangeSaleDto, actor: { userId: string; username: string; storeId?: string }) {
+  async exchange(id: string, dto: ExchangeSaleDto, actor: { userId: string; username: string; storeId: string }) {
+    assertStoreId(actor.storeId);
     const originalSale = await this.prisma.sale.findUnique({
-      where: { id, ...(actor.storeId ? { storeId: actor.storeId } : {}) },
-      include: { items: { where: { ...(actor.storeId ? { storeId: actor.storeId } : {}) } } },
+      where: { id, storeId: actor.storeId },
+      include: { items: { where: { storeId: actor.storeId } } },
     });
 
     if (!originalSale) throw new NotFoundException(`Sale ${id} not found`);
     const exchangeShift = await this.prisma.shift.findUnique({ where: { id: dto.shiftId, storeId: actor.storeId } });
-    if (!exchangeShift || (actor.storeId && exchangeShift.storeId !== actor.storeId) || exchangeShift.cashierId !== actor.userId || exchangeShift.status !== ShiftStatus.OPEN) {
+    if (!exchangeShift || exchangeShift.storeId !== actor.storeId || exchangeShift.cashierId !== actor.userId || exchangeShift.status !== ShiftStatus.OPEN) {
       throw new BadRequestException('الوردية غير صالحة أو لا تملكها');
     }
     if (originalSale.refundStatus === RefundStatus.FULL) {
@@ -420,7 +426,7 @@ export class SalesService {
             }),
           },
         },
-        include: { items: { where: { ...(actor.storeId ? { storeId: actor.storeId } : {}) } } },
+        include: { items: { where: { storeId: actor.storeId } } },
       });
     });
 
@@ -433,13 +439,13 @@ export class SalesService {
     });
 
     const finalNewSale = await this.prisma.sale.findFirst({
-      where: { id: newSale.id, ...(actor.storeId ? { storeId: actor.storeId } : {}) },
-      include: { items: { where: { ...(actor.storeId ? { storeId: actor.storeId } : {}) }, include: { variant: { include: { product: true } } } } },
+      where: { id: newSale.id, storeId: actor.storeId },
+      include: { items: { where: { storeId: actor.storeId }, include: { variant: { include: { product: true } } } } },
     });
 
     const finalOriginalSale = await this.prisma.sale.findFirst({
-      where: { id, ...(actor.storeId ? { storeId: actor.storeId } : {}) },
-      include: { items: { where: { ...(actor.storeId ? { storeId: actor.storeId } : {}) }, include: { variant: { include: { product: true } } } } },
+      where: { id, storeId: actor.storeId },
+      include: { items: { where: { storeId: actor.storeId }, include: { variant: { include: { product: true } } } } },
     });
 
     return {

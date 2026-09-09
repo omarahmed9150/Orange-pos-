@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type MouseEvent } from 'react';
 import { api } from '../lib/api';
 import { useI18n } from '../context/I18nContext';
 
@@ -87,7 +87,8 @@ export function Settings() {
     }
   }
 
-  async function generateLink() {
+  async function generateLink(e: MouseEvent<HTMLButtonElement>) {
+    e?.preventDefault();
     setLoading(true);
     setMessage('');
     try {
@@ -400,7 +401,7 @@ export function Settings() {
         {message && <p className="text-sm text-orange-dark">{message}</p>}
 
         {!link ? (
-          <button onClick={generateLink} disabled={loading} className="bg-orange text-white rounded-lg px-4 py-2 font-semibold">
+          <button type="button" onClick={generateLink} disabled={loading} className="bg-orange text-white rounded-lg px-4 py-2 font-semibold">
             توليد رابط الربط
           </button>
         ) : botConfigured ? (

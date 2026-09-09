@@ -3,6 +3,7 @@ import { StockMovementType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { StockCountDto } from './dto/stock-count.dto';
+import { assertStoreId } from '../../common/security/store-scope';
 
 @Injectable()
 export class InventoryService {
@@ -13,6 +14,7 @@ export class InventoryService {
 
   /** تنبيهات: نفاد أو انخفاض المخزون + قرب انتهاء الصلاحية (خلال 15 يوم) + منتهية فعلاً */
   async getAlerts(storeId: string) {
+    assertStoreId(storeId);
     const now = new Date();
     const in15Days = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
 
@@ -36,6 +38,7 @@ export class InventoryService {
 
   /** سجل حركة صنف معيّن (بيع/شراء/جرد/تعديل يدوي) */
   movementHistory(variantId: string, storeId: string) {
+    assertStoreId(storeId);
     return this.prisma.stockMovement.findMany({
       where: { variantId, storeId, variant: { storeId, product: { storeId } } },
       include: { variant: { include: { product: true } } },
@@ -46,6 +49,7 @@ export class InventoryService {
 
   /** جرد كامل أو جزئي: يقارن الكمية المسجّلة بالمعدودة فعلياً ويعدّل الفرق + يسجّل الحركة */
   async applyStockCount(dto: StockCountDto, userId: string, storeId: string) {
+    assertStoreId(storeId);
     const results: { variantId: string; before: number; after: number; diff: number }[] = [];
 
     await this.prisma.$transaction(async (tx) => {

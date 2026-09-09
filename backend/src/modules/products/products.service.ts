@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { assertStoreId } from '../../common/security/store-scope';
 import { CreateProductDto } from './dto/create-product.dto';
 import { QuickUpdateVariantDto } from './dto/quick-update-variant.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -35,6 +36,7 @@ export class ProductsService {
   ) {}
 
   create(dto: CreateProductDto, storeId: string) {
+    assertStoreId(storeId);
     return this.prisma.product.create({
       data: {
         storeId,
@@ -56,6 +58,7 @@ export class ProductsService {
   }
 
   async updateImage(id: string, imageUrl: string | null, storeId: string) {
+    assertStoreId(storeId);
     const product = await this.prisma.product.findFirst({ where: { id, storeId } });
     if (!product) throw new NotFoundException(`Product ${id} not found`);
 
@@ -67,6 +70,7 @@ export class ProductsService {
   }
 
   async update(id: string, dto: UpdateProductDto, userId: string, storeId: string) {
+    assertStoreId(storeId);
     const product = await this.prisma.product.findFirst({
       where: { id, storeId },
       include: { variants: { where: { storeId }, take: 1 } },
@@ -101,6 +105,7 @@ export class ProductsService {
   }
 
   async remove(id: string, userId: string, storeId: string) {
+    assertStoreId(storeId);
     const product = await this.prisma.product.findFirst({ where: { id, storeId } });
     if (!product) throw new NotFoundException(`Product ${id} not found`);
     await this.prisma.product.delete({ where: { id, storeId } });
@@ -109,6 +114,7 @@ export class ProductsService {
   }
 
   async quickUpdateVariant(variantId: string, dto: QuickUpdateVariantDto, userId: string, storeId: string) {
+    assertStoreId(storeId);
     if (dto.sellingPrice === undefined && dto.stockQuantity === undefined) {
       throw new NotFoundException('لم يتم إرسال أي قيمة للتعديل');
     }
@@ -151,6 +157,7 @@ export class ProductsService {
   }
 
   findAll(storeId: string) {
+    assertStoreId(storeId);
     return this.prisma.product.findMany({
       where: { storeId },
       include: { variants: { where: { storeId } } },
@@ -159,6 +166,7 @@ export class ProductsService {
   }
 
   search(query: string, storeId: string) {
+    assertStoreId(storeId);
     const term = query.trim();
     if (!term) {
       return this.findAll(storeId);
@@ -191,6 +199,7 @@ export class ProductsService {
   }
 
   async findOne(id: string, storeId: string) {
+    assertStoreId(storeId);
     const product = await this.prisma.product.findUnique({
       where: { id, storeId },
       include: { variants: { where: { storeId } } },
@@ -204,6 +213,7 @@ export class ProductsService {
   }
 
   async findByBarcode(barcode: string, storeId: string) {
+    assertStoreId(storeId);
     const variant = await this.prisma.variant.findFirst({
       where: { barcode, storeId, product: { storeId } },
       include: { product: true },
@@ -217,6 +227,7 @@ export class ProductsService {
   }
 
   async findBySku(sku: string, storeId: string) {
+    assertStoreId(storeId);
     const variant = await this.prisma.variant.findFirst({
       where: { sku, storeId, product: { storeId } },
       include: { product: true },
@@ -234,6 +245,7 @@ export class ProductsService {
    * لا يتقاطع مع صيغة باركود الميزان الإلكتروني (13 رقماً تبدأ بـ 2) المُستخدَمة بشاشة البيع.
    */
   async generateUniqueBarcode(storeId: string): Promise<string> {
+    assertStoreId(storeId);
     for (let attempt = 0; attempt < 20; attempt++) {
       const randomDigits = Array.from({ length: 11 }, () => Math.floor(Math.random() * 10)).join('');
       const candidate = `9${randomDigits}`;
@@ -264,6 +276,7 @@ export class ProductsService {
    * يتخطى أي صف SKU مكرر موجود أصلاً بقاعدة البيانات، ويجمع كل الأخطاء بدل التوقف عند أول خطأ.
    */
   async importFromExcel(buffer: Buffer, userId: string, storeId: string) {
+    assertStoreId(storeId);
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(buffer as any);
     const sheet = workbook.worksheets[0];

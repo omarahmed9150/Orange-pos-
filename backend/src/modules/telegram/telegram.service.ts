@@ -3,6 +3,7 @@ import * as crypto from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StoreSettingsService } from '../store-settings/store-settings.service';
 import TelegramBot = require('node-telegram-bot-api');
+import { assertStoreId } from '../../common/security/store-scope';
 
 @Injectable()
 export class TelegramService {
@@ -62,6 +63,7 @@ export class TelegramService {
 
   /** يولّد توكن ربط مؤقت ورابط Deep Link خاص بالمستخدم */
   async generateLinkToken(userId: string, storeId: string) {
+    assertStoreId(storeId);
     const token = crypto.randomBytes(16).toString('hex');
     await this.prisma.user.update({ where: { id: userId, storeId }, data: { telegramLinkToken: token } });
 
@@ -72,6 +74,7 @@ export class TelegramService {
   }
 
   async unlink(userId: string, storeId: string) {
+    assertStoreId(storeId);
     await this.storeSettings.setTelegramChatId(storeId, null);
     await this.prisma.user.update({ where: { id: userId }, data: { telegramChatId: null } });
   }
