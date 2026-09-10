@@ -1,16 +1,29 @@
 {
   "version": 2,
-  "installCommand": "cd backend && npm install --include=dev --production=false",
   "builds": [
     {
       "src": "backend/api/index.ts",
       "use": "@vercel/node"
+    },
+    {
+      "src": "desktop-client/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
       "dest": "/backend/api/index.ts"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/desktop-client/$1"
     }
   ]
 }
