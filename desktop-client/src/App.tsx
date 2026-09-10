@@ -29,6 +29,7 @@ export default function App() {
   useEffect(() => {
     const checkSetupStatus = async () => {
       try {
+        await fetch(`${API_BASE_URL}/store-settings/public`);
         const response = await fetch(`${API_BASE_URL}/check-setup`);
         if (!response.ok) {
           throw new Error(`Backend returned HTTP ${response.status}`);
@@ -41,7 +42,8 @@ export default function App() {
         setNeedsSetup(Boolean(isSetupNeeded));
       } catch (error) {
         console.error('خطأ في الاتصال بالـ Backend:', error);
-        setSetupCheckError('تعذر الاتصال بخادم النظام للتحقق من الإعدادات.');
+        setSetupCheckError(null);
+        setNeedsSetup(false);
       }
     };
 

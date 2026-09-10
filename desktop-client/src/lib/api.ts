@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { clearAuthSession } from './auth-storage';
 
-export const API_BASE_URL = 'https://backend-nine-swart-94.vercel.app/api';
+export const API_BASE_URL = 'https://orange-pos-olive.vercel.app/api';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,

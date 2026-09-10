@@ -19,12 +19,9 @@ export class StoreSettingsController {
    */
   @Get('public')
   @Public()
-  @ApiOperation({ summary: 'معلومات عامة لشاشة الدخول (اسم التطبيق ولغة الواجهة الافتراضية فقط)' })
-  getPublicInfo() {
-    return {
-      storeName: 'ORANGE POS',
-      defaultLanguage: 'ar',
-    };
+  @ApiOperation({ summary: 'عرض إعدادات المتجر العامة لشاشة الدخول' })
+  getPublicSettings() {
+    return this.service.getPublicSettings();
   }
 
   @Get()

@@ -11,6 +11,14 @@ export class StoreSettingsService {
     private readonly audit: AuditService,
   ) {}
 
+  getPublicSettings() {
+    return {
+      storeName: 'ORANGE POS',
+      defaultLanguage: 'ar',
+      currency: 'IQD',
+    };
+  }
+
   /**
    * يرجّع إعدادات متجر واحد فقط (storeId فريد unique)، وينشئ صف خاص به عند أول استخدام إن لم يوجد.
    * لا يوجد أي صف "singleton" مشترك بعد الآن - كل متجر معزول تماماً بصف مستقل خاص به.
