@@ -56,11 +56,13 @@ export function saveAuthSession(token: string, user: AuthUser) {
 }
 
 export function readStoredUser(): AuthUser | null {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) return null;
   const raw = localStorage.getItem(USER_KEY);
   if (!raw) return null;
   try {
     const user = JSON.parse(raw) as AuthUser;
-    if (!validStoreId(user.storeId)) {
+    if (!validStoreId(user.storeId) || getStoredTokenStoreId() !== user.storeId) {
       localStorage.removeItem(USER_KEY);
       localStorage.removeItem(STORE_KEY);
       return null;

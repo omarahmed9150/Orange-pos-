@@ -39,9 +39,11 @@ process.on('unhandledRejection', showFatalError);
 function createMainWindow() {
   const iconPath = path.join(__dirname, '../dist/icon.png');
   const windowOptions: BrowserWindowConstructorOptions = {
-    width: 1920,
-    height: 1080,
-    fullscreen: true,
+    width: 1280,
+    height: 800,
+    frame: true,
+    fullscreen: false,
+    resizable: true,
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -54,6 +56,12 @@ function createMainWindow() {
 
   mainWindow = new BrowserWindow({
     ...windowOptions,
+  });
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.control && input.shift && input.key.toLowerCase() === 'i') {
+      event.preventDefault();
+      mainWindow?.webContents.toggleDevTools();
+    }
   });
 
   if (isDev) {

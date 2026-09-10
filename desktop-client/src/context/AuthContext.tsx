@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { api } from '../lib/api';
 import { clearAuthSession, readStoredUser, saveAuthSession } from '../lib/auth-storage';
 
@@ -30,6 +30,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return readStoredUser();
   });
   const [locked, setLocked] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const lockOnInactiveWindow = () => setLocked(true);
+    const logoutBeforeClose = () => {
+      clearAuthSession();
+      setUser(null);
+      setLocked(false);
+    };
+
+    document.addEventListener('visibilitychange', lockOnInactiveWindow);
+    window.addEventListener('blur', lockOnInactiveWindow);
+    window.addEventListener('beforeunload', logoutBeforeClose);
+    return () => {
+      document.removeEventListener('visibilitychange', lockOnInactiveWindow);
+      window.removeEventListener('blur', lockOnInactiveWindow);
+      window.removeEventListener('beforeunload', logoutBeforeClose);
+    };
+  }, [user]);
 
   async function login(username: string, password: string) {
     clearAuthSession();
