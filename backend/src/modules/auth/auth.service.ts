@@ -92,6 +92,41 @@ export class AuthService {
     };
   }
 
+  async setupAdmin(usernameInput: string | undefined, password: string | undefined, storeNameInput: string | undefined) {
+    if (!usernameInput?.trim() || !storeNameInput?.trim() || !password) {
+      throw new BadRequestException('يرجى إدخال اسم المتجر واسم المستخدم وكلمة المرور كامليْن');
+    }
+
+    if (await this.prisma.user.count() > 0) {
+      throw new BadRequestException('تم إعداد النظام مسبقاً، لا يمكن إنشاء حساب مسؤول جديد عبر هذا المسار');
+    }
+
+    const username = usernameInput.trim();
+    const storeName = storeNameInput.trim();
+    const passwordHash = await bcrypt.hash(password, 12);
+    const storeId = randomUUID();
+    const newAdmin = await this.prisma.$transaction(async (tx) => {
+      await tx.store.create({ data: { id: storeId, name: storeName } });
+      await tx.storeSettings.create({ data: { storeId, storeName } });
+      return tx.user.create({
+        data: {
+          username,
+          fullName: 'المدير العام',
+          passwordHash,
+          role: UserRole.SUPER_ADMIN,
+          isActive: true,
+          storeId,
+        },
+      });
+    });
+
+    return {
+      success: true,
+      message: 'تم إنشاء حساب المسؤول الرئيسي بنجاح',
+      userId: newAdmin.id,
+    };
+  }
+
   /** تعيين/تغيير PIN الخاص بالمستخدم الحالي - يتطلب تأكيد كلمة السر لأمان إضافي */
   async setPin(userId: string, dto: SetPinDto) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });

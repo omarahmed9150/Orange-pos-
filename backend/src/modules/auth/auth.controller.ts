@@ -22,6 +22,13 @@ export class AuthController {
     return this.authService.login(dto);
   }
 
+  @Public()
+  @Post('setup-admin')
+  @ApiOperation({ summary: 'إنشاء حساب المسؤول والمتجر الأولي' })
+  setupAdmin(@Body() body: { username?: string; password?: string; storeName?: string }) {
+    return this.authService.setupAdmin(body.username, body.password, body.storeName);
+  }
+
   @Post('set-pin')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'تعيين/تغيير PIN الخاص بالمستخدم الحالي (يتطلب كلمة السر الحالية)' })

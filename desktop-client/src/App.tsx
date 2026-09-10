@@ -1,5 +1,5 @@
 import { Component, ErrorInfo, ReactNode, useState, useEffect } from 'react';
-import { Route, Routes, useNavigate } from 'react-router-dom';
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Login } from './pages/Login';
@@ -120,12 +120,16 @@ function AppContent() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      {isElectron && (
-        <Route
-          path="/setup"
-          element={<SetupPage onSetupComplete={() => { setNeedsSetup(false); navigate('/login'); }} />}
-        />
-      )}
+      <Route
+        path="/setup"
+        element={
+          isElectron ? (
+            <SetupPage onSetupComplete={() => { setNeedsSetup(false); navigate('/login'); }} />
+          ) : (
+            <Navigate replace to="/login" />
+          )
+        }
+      />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<Layout />}>

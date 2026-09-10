@@ -7,6 +7,7 @@ interface SetupPageProps {
 
 export const SetupPage: React.FC<SetupPageProps> = ({ onSetupComplete }) => {
   const [username, setUsername] = useState('');
+  const [storeName, setStoreName] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
@@ -16,8 +17,8 @@ export const SetupPage: React.FC<SetupPageProps> = ({ onSetupComplete }) => {
     e.preventDefault();
     setError('');
 
-    if (!username.trim() || !password) {
-      setError('يرجى إدخال اسم المستخدم وكلمة المرور');
+    if (!username.trim() || !storeName.trim() || !password) {
+      setError('يرجى إدخال اسم المتجر واسم المستخدم وكلمة المرور');
       return;
     }
 
@@ -34,10 +35,10 @@ export const SetupPage: React.FC<SetupPageProps> = ({ onSetupComplete }) => {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/setup-admin`, {
+      const response = await fetch(`${API_BASE_URL}/auth/setup-admin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: username.trim(), password }),
+        body: JSON.stringify({ username: username.trim(), storeName: storeName.trim(), password }),
       });
 
       const data = await response.json();
@@ -68,6 +69,18 @@ export const SetupPage: React.FC<SetupPageProps> = ({ onSetupComplete }) => {
         {error && <div style={styles.errorBox}>{error}</div>}
 
         <form onSubmit={handleSubmit} style={styles.form}>
+          <div style={styles.inputGroup}>
+            <label style={styles.label}>اسم المتجر:</label>
+            <input
+              type="text"
+              value={storeName}
+              onChange={(e) => setStoreName(e.target.value)}
+              placeholder="مثال: متجر ORANGE"
+              required
+              style={styles.input}
+            />
+          </div>
+
           <div style={styles.inputGroup}>
             <label style={styles.label}>اسم المستخدم:</label>
             <input

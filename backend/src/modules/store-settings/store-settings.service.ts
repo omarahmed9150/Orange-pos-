@@ -11,11 +11,16 @@ export class StoreSettingsService {
     private readonly audit: AuditService,
   ) {}
 
-  getPublicSettings() {
+  async getPublicSettings() {
+    const settings = await this.prisma.storeSettings.findFirst({
+      orderBy: { updatedAt: 'desc' },
+      select: { storeName: true, currency: true, defaultLanguage: true },
+    });
+
     return {
-      storeName: 'ORANGE POS',
-      defaultLanguage: 'ar',
-      currency: 'IQD',
+      storeName: settings?.storeName?.trim() || 'ORANGE POS',
+      defaultLanguage: settings?.defaultLanguage || 'ar',
+      currency: settings?.currency || 'IQD',
     };
   }
 

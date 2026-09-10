@@ -4,6 +4,7 @@ import { useI18n } from '../context/I18nContext';
 import { LockScreen } from './LockScreen';
 import { UpdateBanner } from './UpdateBanner';
 import { APP_BUILD_DATE, APP_VERSION } from '../lib/version';
+import { useStoreSettings } from '../context/StoreSettingsContext';
 
 const navItems = [
   { to: '/', icon: '📊', key: 'dashboard', roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'CASHIER'] },
@@ -27,6 +28,7 @@ const navItems = [
 export function Layout() {
   const { user, logout, locked, lock } = useAuth();
   const { t } = useI18n();
+  const { storeName } = useStoreSettings();
 
   return (
     <>
@@ -36,7 +38,7 @@ export function Layout() {
       <div className="flex flex-1 overflow-hidden">
       <aside className="w-64 bg-white border-l flex flex-col">
         <div className="p-4 border-b">
-          <h1 className="text-2xl font-bold text-orange">ORANGE</h1>
+          <h1 className="text-2xl font-bold text-orange">{storeName}</h1>
           <p className="text-xs text-gray-500">نظام إدارة نقاط البيع</p>
         </div>
 

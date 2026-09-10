@@ -7,6 +7,7 @@ import { I18nProvider } from './context/I18nContext';
 import { ProductCacheProvider } from './context/ProductCacheContext';
 import { LicenseGate } from './components/LicenseGate';
 import { clearStorageIfTokenHasInvalidStore } from './lib/auth-storage';
+import { StoreSettingsProvider } from './context/StoreSettingsContext';
 import './index.css';
 
 clearStorageIfTokenHasInvalidStore();
@@ -23,9 +24,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <HashRouter>
         <I18nProvider>
           <AuthProvider>
-            <ProductCacheProvider>
-              <App />
-            </ProductCacheProvider>
+            <StoreSettingsProvider>
+              <ProductCacheProvider>
+                <App />
+              </ProductCacheProvider>
+            </StoreSettingsProvider>
           </AuthProvider>
         </I18nProvider>
       </HashRouter>

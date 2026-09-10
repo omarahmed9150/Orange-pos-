@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { SalesTrendChart } from '../components/SalesTrendChart';
+import { useStoreSettings } from '../context/StoreSettingsContext';
 
 interface Sale {
   id: string;
@@ -30,6 +31,7 @@ function startOfRange(range: FilterRange): Date {
 
 export function Dashboard() {
   const { user } = useAuth();
+  const { storeName } = useStoreSettings();
   const [openShiftId, setOpenShiftId] = useState<string | null>(null);
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,7 +85,7 @@ export function Dashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">مرحباً، {user?.fullName}</h1>
+        <h1 className="text-2xl font-bold">مرحباً بك في {storeName}</h1>
         <p className="text-gray-500 text-sm">نظرة سريعة على مبيعاتك</p>
       </div>
 

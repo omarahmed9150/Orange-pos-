@@ -3,11 +3,13 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
 import { isElectron } from '../lib/runtime';
+import { useStoreSettings } from '../context/StoreSettingsContext';
 
 export function Login() {
   const { login } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
+  const { storeName } = useStoreSettings();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -35,7 +37,7 @@ export function Login() {
     <div className="h-screen flex items-center justify-center bg-orange-light">
       <form onSubmit={onSubmit} className="bg-white rounded-2xl shadow-lg p-8 w-96 space-y-4">
         <div className="text-center mb-4">
-          <h1 className="text-3xl font-bold text-orange">ORANGE</h1>
+          <h1 className="text-3xl font-bold text-orange">مرحباً بك في {storeName}</h1>
           <p className="text-gray-500 text-sm">
             نظام إدارة نقاط البيع
           </p>
