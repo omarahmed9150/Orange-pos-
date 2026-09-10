@@ -28,7 +28,7 @@ model Store {
 
 model User {
   id            String    @id @default(uuid())
-  storeId       String    @default("default-store")
+  storeId       String
   username      String    @unique
   fullName      String
   passwordHash  String
@@ -51,7 +51,7 @@ model User {
 // سجل تدقيق لكل العمليات الحساسة (من نفّذ، ماذا، متى)
 model AuditLog {
   id          String   @id @default(uuid())
-  storeId     String   @default("default-store")
+  storeId     String
   userId      String
   action      String   // مثال: SALE_CREATED, SALE_REFUNDED, PRICE_EDITED, USER_BLOCKED
   entityType  String   // مثال: Sale, Product, User
@@ -70,7 +70,7 @@ model AuditLog {
 
 model Product {
   id        String    @id @default(uuid())
-  storeId   String    @default("default-store")
+  storeId   String
   name      String
   category  String
   imageUrl  String?   // صورة اختيارية للمنتج (Base64) لتسهيل التعرف عليه بشاشة البيع
@@ -83,7 +83,7 @@ model Product {
 
 model Variant {
   id             String     @id @default(uuid())
-  storeId        String     @default("default-store")
+  storeId        String
   productId      String
   sku            String     @unique
   barcode        String?    @unique
@@ -114,7 +114,7 @@ enum ShiftStatus {
 
 model Shift {
   id           String      @id @default(uuid())
-  storeId      String      @default("default-store")
+  storeId      String
   cashierId    String      // = User.id صاحب الوردية (عزل البيانات)
   startTime    DateTime    @default(now())
   endTime      DateTime?
@@ -150,7 +150,7 @@ enum RefundStatus {
 
 model Sale {
   id            String        @id @default(uuid())
-  storeId       String        @default("default-store")
+  storeId       String
   shiftId       String
   userId        String        // منشئ الفاتورة (عزل البيانات)
   customerId    String?       // العميل عند البيع بالدين
@@ -181,7 +181,7 @@ model Sale {
 
 model SaleItem {
   id          String  @id @default(uuid())
-  storeId     String  @default("default-store")
+  storeId     String
   saleId      String
   variantId   String
   quantity    Int
@@ -198,7 +198,7 @@ model SaleItem {
 
 model Expense {
   id          String   @id @default(uuid())
-  storeId     String   @default("default-store")
+  storeId     String
   shiftId     String?
   userId      String   // من سجّل المصروف (عزل البيانات)
   title       String
@@ -224,7 +224,7 @@ enum ReceiptType {
 
 model ReceiptTemplate {
   id         String      @id @default(uuid())
-  storeId    String      @default("default-store")
+  storeId    String
   name       String
   appliesTo  ReceiptType @default(ALL)
   isDefault  Boolean     @default(false)
@@ -238,7 +238,7 @@ model ReceiptTemplate {
 
 model BarcodeLabelTemplate {
   id         String   @id @default(uuid())
-  storeId    String   @default("default-store")
+  storeId    String
   name       String
   isDefault  Boolean  @default(false)
   config     String
@@ -253,7 +253,7 @@ model BarcodeLabelTemplate {
 
 model Supplier {
   id        String    @id @default(uuid())
-  storeId   String    @default("default-store")
+  storeId   String
   name      String
   phone     String?
   address   String?
@@ -268,7 +268,7 @@ model Supplier {
 
 model PurchaseInvoice {
   id          String   @id @default(uuid())
-  storeId     String   @default("default-store")
+  storeId     String
   supplierId  String
   userId      String   // من سجّل الفاتورة
   invoiceNo   String?
@@ -286,7 +286,7 @@ model PurchaseInvoice {
 
 model PurchaseInvoiceItem {
   id                String          @id @default(uuid())
-  storeId           String          @default("default-store")
+  storeId           String
   purchaseInvoiceId String
   variantId         String
   quantity          Int
@@ -301,7 +301,7 @@ model PurchaseInvoiceItem {
 // دفعات لتسديد ديون المورد (كشف حساب)
 model SupplierPayment {
   id         String   @id @default(uuid())
-  storeId    String   @default("default-store")
+  storeId    String
   supplierId String
   userId     String
   amount     Float
@@ -325,7 +325,7 @@ enum StockMovementType {
 
 model StockMovement {
   id         String            @id @default(uuid())
-  storeId    String            @default("default-store")
+  storeId    String
   variantId  String
   userId     String
   type       StockMovementType
@@ -341,10 +341,13 @@ model StockMovement {
 }
 
 // ==================== إعدادات المحل العامة ====================
+// ⚠️ تم تصحيح هذا الموديل: كان id ثابتاً بقيمة "singleton" لكامل النظام، مما يعني
+// وجود صف إعدادات واحد فقط يتشاركه جميع المتاجر (عملة/ضريبة/توكن Telegram مشترك للجميع!).
+// الآن كل متجر له صف مستقل خاص به عبر storeId الفريد (unique).
 
 model StoreSettings {
-  id             String   @id @default("singleton") // صف واحد فقط لكل النظام
-  storeId        String   @default("default-store")
+  id             String   @id @default(uuid())
+  storeId        String   @unique
   storeName      String   @default("ORANGE")
   currency       String   @default("IQD")
   taxEnabled     Boolean  @default(false)
@@ -367,7 +370,7 @@ model StoreSettings {
 
 model Customer {
   id        String   @id @default(uuid())
-  storeId   String   @default("default-store")
+  storeId   String
   name      String
   phone     String?
   notes     String?
@@ -382,7 +385,7 @@ model Customer {
 // دفعات تسديد دين العميل
 model CustomerPayment {
   id         String   @id @default(uuid())
-  storeId    String   @default("default-store")
+  storeId    String
   customerId String
   userId     String
   amount     Float

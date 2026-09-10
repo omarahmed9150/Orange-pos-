@@ -26,17 +26,20 @@ export class DatabaseBackupService {
   /** نسخة احتياطية كاملة لملف قاعدة البيانات كل 6 ساعات، تُحفظ بمجلد خارجي (قرص/مزامنة) يحدده صاحب المحل */
   @Cron(CronExpression.EVERY_6_HOURS)
   async runScheduledBackup() {
-    const settings = await this.storeSettings.get();
-    if (!settings.dbBackupDir) {
-      this.logger.warn('لم يُضبط مجلد النسخ الاحتياطي المحلي بعد - تخطي.');
-      return;
+    const stores = await this.prisma.store.findMany({ select: { id: true } });
+    for (const store of stores) {
+      const settings = await this.storeSettings.get(store.id);
+      if (!settings.dbBackupDir) {
+        this.logger.warn(`لم يُضبط مجلد النسخ الاحتياطي المحلي للمتجر ${store.id} - تخطي.`);
+        continue;
+      }
+      await this.runBackupNow(settings.dbBackupDir, store.id);
     }
-    await this.runBackupNow(settings.dbBackupDir);
   }
 
   /** ينفّذ نسخة احتياطية فورية إلى المجلد المحدد، ويحذف النسخ الأقدم من الحد الأقصى */
-  async runBackupNow(targetDir?: string) {
-    const settings = await this.storeSettings.get();
+  async runBackupNow(targetDir: string | undefined, storeId: string) {
+    const settings = await this.storeSettings.get(storeId);
     const dir = targetDir || settings.dbBackupDir;
 
     if (!dir) {
@@ -79,8 +82,8 @@ export class DatabaseBackupService {
   }
 
   /** حالة آخر نسخة احتياطية (للعرض بواجهة الإعدادات) */
-  async getStatus() {
-    const settings = await this.storeSettings.get();
+  async getStatus(storeId: string) {
+    const settings = await this.storeSettings.get(storeId);
     if (!settings.dbBackupDir || !fs.existsSync(settings.dbBackupDir)) {
       return { configured: !!settings.dbBackupDir, lastBackupAt: null, backupsCount: 0 };
     }

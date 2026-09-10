@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Body, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { randomUUID } from 'crypto';
 import { AppService } from './app.service';
 import { Public } from './common/decorators/public.decorator';
 import { UserRole } from '@prisma/client';
@@ -32,26 +33,32 @@ export class AppController {
   @Post('setup-admin')
   @Public()
   @ApiOperation({ summary: 'إنشاء حساب المسؤول الأولي' })
-  async setupAdmin(@Body() body: { username?: string; password?: string }) {
+  async setupAdmin(@Body() body: { username?: string; password?: string; storeName?: string }) {
     const userCount = await this.prisma.user.count();
     if (userCount > 0) {
       throw new BadRequestException('تم إعداد النظام مسبقاً، لا يمكن إنشاء حساب مسؤول جديد عبر هذا المسار');
     }
 
-    const { username, password } = body;
+    const { username, password, storeName } = body;
     if (!username?.trim() || !password) {
       throw new BadRequestException('يرجى إدخال اسم المستخدم وكلمة المرور كامليْن');
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
-    const newAdmin = await this.prisma.user.create({
-      data: {
-        username: username.trim(),
-        fullName: 'المدير العام',
-        passwordHash,
-        role: UserRole.SUPER_ADMIN,
-        isActive: true,
-      },
+    // ننشئ متجراً حقيقياً وفريداً لكل حساب مسؤول - بدون أي قيمة storeId افتراضية مشتركة
+    const storeId = randomUUID();
+    const newAdmin = await this.prisma.$transaction(async (tx) => {
+      await tx.store.create({ data: { id: storeId, name: storeName?.trim() || 'المدير العام - متجر' } });
+      return tx.user.create({
+        data: {
+          username: username.trim(),
+          fullName: 'المدير العام',
+          passwordHash,
+          role: UserRole.SUPER_ADMIN,
+          isActive: true,
+          storeId,
+        },
+      });
     });
 
     return {

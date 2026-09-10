@@ -11,6 +11,9 @@ interface Variant {
   costPrice: number;
   stockQuantity: number;
   minStockLevel: number;
+  wholesalePrice: number | null;
+  vipPrice: number | null;
+  expiryDate: string | null;
 }
 
 interface Product {
@@ -19,6 +22,37 @@ interface Product {
   category: string;
   imageUrl: string | null;
   variants: Variant[];
+}
+
+function toDateInputValue(value: string | null | undefined): string {
+  if (!value) return '';
+  const dateOnly = value.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
+  return dateOnly || '';
+}
+
+function expiryState(value: string | null): 'expired' | 'soon' | 'normal' | 'none' {
+  if (!value) return 'none';
+  const expiry = new Date(`${toDateInputValue(value)}T23:59:59.999Z`);
+  if (Number.isNaN(expiry.getTime())) return 'none';
+  const now = new Date();
+  const daysRemaining = (expiry.getTime() - now.getTime()) / 86400000;
+  if (daysRemaining < 0) return 'expired';
+  if (daysRemaining < 30) return 'soon';
+  return 'normal';
+}
+
+function expiryWarningClass(value: string | null): string {
+  const state = expiryState(value);
+  if (state === 'expired') return 'bg-red-100 text-red-700';
+  if (state === 'soon') return 'bg-amber-100 text-amber-700';
+  return 'bg-gray-50';
+}
+
+function expiryLabel(value: string | null): string {
+  const state = expiryState(value);
+  if (state === 'expired') return `منتهي: ${toDateInputValue(value)}`;
+  if (state === 'soon') return `ينتهي قريباً: ${toDateInputValue(value)}`;
+  return '';
 }
 
 export function Products() {
@@ -76,7 +110,7 @@ export function Products() {
             wholesalePrice: wholesalePrice ? Number(wholesalePrice) : undefined,
             vipPrice: vipPrice ? Number(vipPrice) : undefined,
             stockQuantity: Number(stock) || 0,
-            expiryDate: expiryDate || undefined,
+            expiryDate: expiryDate ? new Date(`${expiryDate}T00:00:00.000Z`).toISOString() : undefined,
           },
         ],
       };
@@ -91,6 +125,7 @@ export function Products() {
           wholesalePrice: wholesalePrice ? Number(wholesalePrice) : undefined,
           vipPrice: vipPrice ? Number(vipPrice) : undefined,
           stockQuantity: Number(stock) || 0,
+          expiryDate: expiryDate ? new Date(`${expiryDate}T00:00:00.000Z`).toISOString() : null,
         });
       } else {
         await api.post('/products', payload);
@@ -117,9 +152,10 @@ export function Products() {
     setBarcode(variant.barcode || '');
     setCostPrice(String(variant.costPrice));
     setSellingPrice(String(variant.sellingPrice));
-    setWholesalePrice('');
-    setVipPrice('');
+    setWholesalePrice(variant.wholesalePrice === null ? '' : String(variant.wholesalePrice));
+    setVipPrice(variant.vipPrice === null ? '' : String(variant.vipPrice));
     setStock(String(variant.stockQuantity));
+    setExpiryDate(toDateInputValue(variant.expiryDate));
     setShowForm(true);
   }
 
@@ -301,7 +337,12 @@ export function Products() {
               </div>
               <div className="mt-2 flex flex-wrap gap-2">
                 {p.variants.map((v) => (
-                  <div key={v.id} className="bg-gray-50 rounded-lg px-3 py-1.5 text-sm flex items-center gap-2">
+                  <div
+                    key={v.id}
+                    className={`rounded-lg px-3 py-1.5 text-sm flex items-center gap-2 ${
+                      expiryWarningClass(v.expiryDate)
+                    }`}
+                  >
                     <button
                       type="button"
                       className="underline text-blue-600"
@@ -331,6 +372,9 @@ export function Products() {
                     <span className={v.stockQuantity <= v.minStockLevel ? 'text-red-500' : 'text-gray-500'}>
                       مخزون: {v.stockQuantity}
                     </span>
+                    {expiryLabel(v.expiryDate) && (
+                      <span className="font-semibold">{expiryLabel(v.expiryDate)}</span>
+                    )}
                   </div>
                 ))}
               </div>

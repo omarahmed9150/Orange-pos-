@@ -12,12 +12,27 @@ import { UpdateStoreSettingsDto } from './dto/update-settings.dto';
 export class StoreSettingsController {
   constructor(private readonly service: StoreSettingsService) {}
 
+  /**
+   * معلومات عامة لشاشة الدخول فقط (قبل تسجيل الدخول) - لا تخص أي متجر بعينه ولا تكشف اسم
+   * أو بيانات أي متجر حقيقي للعامة. هذا يحل التعارض القديم الذي كان يعرض اسم/بيانات متجر
+   * "افتراضي مشترك" لأي زائر لشاشة الدخول قبل حتى تسجيل الدخول.
+   */
+  @Get('public')
+  @Public()
+  @ApiOperation({ summary: 'معلومات عامة لشاشة الدخول (اسم التطبيق ولغة الواجهة الافتراضية فقط)' })
+  getPublicInfo() {
+    return {
+      storeName: 'ORANGE POS',
+      defaultLanguage: 'ar',
+    };
+  }
+
   @Get()
-  @Public() // تُقرأ حتى قبل تسجيل الدخول (لعرض اسم المحل ولغة الواجهة في شاشة الدخول)
-  @ApiOperation({ summary: 'عرض إعدادات المحل (اسم، عملة، ضريبة، لغة)' })
-  async get() {
-    const settings = await this.service.get();
-    const { licenseKey, telegramBotToken, telegramChatId, ...publicSettings } = settings; // لا نُسرّب الأسرار عبر المسار العام
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'عرض إعدادات المتجر الخاصة بالمستخدم الحالي (اسم، عملة، ضريبة، لغة)' })
+  async get(@CurrentUser() user: AuthenticatedUser) {
+    const settings = await this.service.get(user.storeId);
+    const { licenseKey, telegramBotToken, telegramChatId, ...publicSettings } = settings; // لا نُسرّب الأسرار حتى للأدوار غير الإدارية
     return publicSettings;
   }
 

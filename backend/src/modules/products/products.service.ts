@@ -88,7 +88,7 @@ export class ProductsService {
     });
     if (!product || !product.variants[0]) throw new NotFoundException(`Product ${id} not found`);
 
-    const { name, category, imageUrl, barcode, costPrice, sellingPrice, wholesalePrice, vipPrice, stockQuantity } = dto;
+    const { name, category, imageUrl, barcode, costPrice, sellingPrice, wholesalePrice, vipPrice, stockQuantity, expiryDate } = dto;
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.product.update({
         where: { id, storeId },
@@ -107,6 +107,9 @@ export class ProductsService {
           ...(wholesalePrice !== undefined ? { wholesalePrice } : {}),
           ...(vipPrice !== undefined ? { vipPrice } : {}),
           ...(stockQuantity !== undefined ? { stockQuantity } : {}),
+          ...(expiryDate !== undefined
+            ? { expiryDate: expiryDate === null ? null : parseOptionalDate(expiryDate) }
+            : {}),
         },
         include: { product: true },
       });
