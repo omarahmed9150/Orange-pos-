@@ -1,31 +1,34 @@
+import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app.module';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import express from 'express';
 
 const server = express();
-let appInstance: any;
+let isReady = false;
 
-async function getApp() {
-  if (!appInstance) {
-    appInstance = await NestFactory.create(AppModule, new ExpressAdapter(server));
-    appInstance.setGlobalPrefix('api');
-    appInstance.enableCors({ origin: true, credentials: true });
-    await appInstance.init();
+async function bootstrap() {
+  if (!isReady) {
+    const app = await NestFactory.create(AppModule, new ExpressAdapter(server), {
+      logger: ['error', 'warn'],
+    });
+    app.setGlobalPrefix('api');
+    app.enableCors({ origin: true, credentials: true });
+    await app.init();
+    isReady = true;
   }
-  return appInstance;
 }
 
 export default async function handler(req: any, res: any) {
   try {
-    await getApp();
+    await bootstrap();
     server(req, res);
   } catch (err: any) {
-    console.error('Serverless Bootstrap Error:', err);
+    console.error('Vercel Handler Error:', err);
     res.status(500).json({
       statusCode: 500,
-      message: 'Serverless Bootstrap Failed',
-      error: err?.message || String(err),
+      error: 'Initialization Error',
+      message: err?.message || String(err),
     });
   }
 }
