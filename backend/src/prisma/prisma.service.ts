@@ -9,7 +9,7 @@ export class PrismaService
   private readonly logger = new Logger(PrismaService.name);
 
   async onModuleInit() {
-    await this.$connect();
+    // Prisma connects lazily when the first query is executed.
   }
 
   async onModuleDestroy() {
