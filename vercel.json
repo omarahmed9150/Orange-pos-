@@ -18,7 +18,7 @@
   ],
   "functions": {
     "backend/api/index.ts": {
-      "includeFiles": "node_modules/.prisma/client/**"
+      "includeFiles": "backend/dist/**, node_modules/.prisma/client/**"
     }
   }
 }

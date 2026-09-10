@@ -5,12 +5,18 @@ let cachedServer: any;
 async function bootstrapServer() {
   if (!cachedServer) {
     const { NestFactory } = await import('@nestjs/core');
-    const { AppModule } = await import('../src/app.module');
     const { ExpressAdapter } = await import('@nestjs/platform-express');
     const express = (await import('express')).default;
 
+    let appModule;
+    try {
+      appModule = (await import('../dist/src/app.module')).AppModule;
+    } catch (e) {
+      appModule = (await import('../dist/app.module')).AppModule;
+    }
+
     const server = express();
-    const app = await NestFactory.create(AppModule, new ExpressAdapter(server), {
+    const app = await NestFactory.create(appModule, new ExpressAdapter(server), {
       logger: ['error', 'warn'],
     });
 
@@ -33,6 +39,7 @@ export default async function handler(req: any, res: any) {
       statusCode: 500,
       error: 'Server Initialization Failed',
       message: err?.message || String(err),
+      stack: err?.stack,
     });
   }
 }
