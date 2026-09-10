@@ -3,14 +3,14 @@
   "installCommand": "npm install --include=dev && npx prisma generate",
   "builds": [
     {
-      "src": "src/main.ts",
+      "src": "api/index.ts",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
-      "src": "/(.*)",
-      "dest": "src/main.ts"
+      "src": "/api/(.*)",
+      "dest": "api/index.ts"
     }
   ]
 }
