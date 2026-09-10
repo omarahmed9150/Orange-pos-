@@ -4,26 +4,21 @@
     {
       "src": "backend/api/index.ts",
       "use": "@vercel/node"
-    },
-    {
-      "src": "desktop-client/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/backend/api/index.ts"
-    },
-    {
-      "handle": "filesystem"
+      "dest": "backend/api/index.ts"
     },
     {
       "src": "/(.*)",
-      "dest": "/desktop-client/$1"
+      "dest": "/index.html"
     }
-  ]
+  ],
+  "functions": {
+    "backend/api/index.ts": {
+      "includeFiles": "node_modules/.prisma/client/**"
+    }
+  }
 }
