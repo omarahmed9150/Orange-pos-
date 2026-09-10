@@ -1,6 +1,9 @@
 {
+  "name": "orange-pos-monorepo",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
+    "build": "cd backend && npm install && npx prisma generate && npm run build",
     "build:desktop": "cd desktop-client && npm install && npx vite build"
   }
 }

@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import path from 'path';
 
 let cachedServer: any;
 
@@ -8,11 +9,24 @@ async function bootstrapServer() {
     const { ExpressAdapter } = await import('@nestjs/platform-express');
     const express = (await import('express')).default;
 
+    const distPath1 = path.join(process.cwd(), 'backend', 'dist', 'src', 'app.module');
+    const distPath2 = path.join(process.cwd(), 'backend', 'dist', 'app.module');
+    const distPath3 = path.resolve(__dirname, '../dist/src/app.module');
+    const distPath4 = path.resolve(__dirname, '../dist/app.module');
+
     let appModule;
     try {
-      appModule = (await import('../dist/src/app.module')).AppModule;
-    } catch (e) {
-      appModule = (await import('../dist/app.module')).AppModule;
+      appModule = (await import(distPath1)).AppModule;
+    } catch {
+      try {
+        appModule = (await import(distPath2)).AppModule;
+      } catch {
+        try {
+          appModule = (await import(distPath3)).AppModule;
+        } catch {
+          appModule = (await import(distPath4)).AppModule;
+        }
+      }
     }
 
     const server = express();
