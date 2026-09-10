@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Route, Routes } from 'react-router-dom';
+import { Component, ErrorInfo, ReactNode, useState, useEffect } from 'react';
+import { Route, Routes, useNavigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Login } from './pages/Login';
@@ -21,15 +21,69 @@ import { ReceiptDesigner } from './pages/ReceiptDesigner';
 import { Users } from './pages/Users';
 import { SetupPage } from './pages/SetupPage';
 import { API_BASE_URL } from './lib/api';
+import { isElectron } from './lib/runtime';
 
-export default function App() {
+const defaultSettings = { storeName: 'ORANGE POS', currency: 'IQD' };
+
+interface ErrorBoundaryProps {
+  children: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+}
+
+export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { hasError: false };
+
+  static getDerivedStateFromError(): ErrorBoundaryState {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('Unhandled renderer error:', error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="h-screen flex items-center justify-center bg-orange-light" dir="rtl">
+          <div className="bg-white rounded-2xl shadow-lg p-8 text-center space-y-4">
+            <h1 className="text-xl font-bold text-red-600">تعذر عرض التطبيق</h1>
+            <p className="text-gray-600">حدث خطأ غير متوقع أثناء تشغيل الواجهة.</p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="bg-orange text-white rounded-lg px-4 py-2 font-semibold"
+            >
+              إعادة تحميل الشاشة
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function AppContent() {
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
-  const [setupCheckError, setSetupCheckError] = useState<string | null>(null);
+  const [publicSettings, setPublicSettings] = useState(defaultSettings);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const checkSetupStatus = async () => {
       try {
-        await fetch(`${API_BASE_URL}/store-settings/public`);
+        const publicResponse = await fetch(`${API_BASE_URL}/store-settings/public`);
+        if (publicResponse.ok) {
+          const data = await publicResponse.json();
+          setPublicSettings({
+            storeName: typeof data.storeName === 'string' ? data.storeName : defaultSettings.storeName,
+            currency: typeof data.currency === 'string' ? data.currency : defaultSettings.currency,
+          });
+        } else {
+          setPublicSettings(defaultSettings);
+        }
         const response = await fetch(`${API_BASE_URL}/check-setup`);
         if (!response.ok) {
           throw new Error(`Backend returned HTTP ${response.status}`);
@@ -38,11 +92,10 @@ export default function App() {
 
         // التحقق مما إذا كان النظام يحتاج إعداداً بأي طريقة من قيم الاستجابة
         const isSetupNeeded = data.needsSetup ?? (data.isConfigured !== undefined ? !data.isConfigured : false);
-        setSetupCheckError(null);
         setNeedsSetup(Boolean(isSetupNeeded));
       } catch (error) {
         console.error('خطأ في الاتصال بالـ Backend:', error);
-        setSetupCheckError(null);
+        setPublicSettings(defaultSettings);
         setNeedsSetup(false);
       }
     };
@@ -54,20 +107,25 @@ export default function App() {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', direction: 'rtl', fontFamily: 'sans-serif' }}>
         <div style={{ textAlign: 'center' }}>
-          <h3>{setupCheckError ?? 'جاري التحقق من إعدادات النظام...'}</h3>
-          {setupCheckError && <p>يرجى التأكد من اتصال الخادم ثم إعادة تحميل الصفحة.</p>}
+          <h3>جاري التحقق من إعدادات {publicSettings.storeName}...</h3>
         </div>
       </div>
     );
   }
 
-  if (needsSetup) {
-    return <SetupPage onSetupComplete={() => setNeedsSetup(false)} />;
+  if (needsSetup && isElectron) {
+    return <SetupPage onSetupComplete={() => { setNeedsSetup(false); navigate('/login'); }} />;
   }
 
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      {isElectron && (
+        <Route
+          path="/setup"
+          element={<SetupPage onSetupComplete={() => { setNeedsSetup(false); navigate('/login'); }} />}
+        />
+      )}
 
       <Route element={<ProtectedRoute />}>
         <Route element={<Layout />}>
@@ -96,5 +154,13 @@ export default function App() {
         </Route>
       </Route>
     </Routes>
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
   );
 }

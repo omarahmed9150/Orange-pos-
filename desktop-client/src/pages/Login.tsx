@@ -1,7 +1,8 @@
 import { FormEvent, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
+import { isElectron } from '../lib/runtime';
 
 export function Login() {
   const { login } = useAuth();
@@ -71,6 +72,15 @@ export function Login() {
         >
           {loading ? '...' : t('login')}
         </button>
+
+        {isElectron && (
+          <Link
+            to="/setup"
+            className="block text-center text-sm text-orange hover:text-orange-dark font-semibold"
+          >
+            إنشاء حساب / متجر جديد
+          </Link>
+        )}
       </form>
     </div>
   );
