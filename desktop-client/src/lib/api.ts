@@ -5,6 +5,7 @@ export const API_BASE_URL = 'https://orange-pos-olive.vercel.app/api';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 15000,
 });
 
 // إرفاق توكن الدخول تلقائياً بكل طلب

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { API_BASE_URL } from '../lib/api';
+import axios from 'axios';
+import { api } from '../lib/api';
 
 interface SetupPageProps {
   onSetupComplete: () => void;
@@ -35,22 +36,25 @@ export const SetupPage: React.FC<SetupPageProps> = ({ onSetupComplete }) => {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/setup-admin`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: username.trim(), storeName: storeName.trim(), password }),
+      const { data } = await api.post('/auth/setup-admin', {
+        username: username.trim(),
+        storeName: storeName.trim(),
+        password,
       });
 
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (data.success) {
         alert('تم إنشاء حساب المسؤول بنجاح! يمكنك الآن تسجيل الدخول.');
         onSetupComplete();
       } else {
         setError(data.message || data.error || 'حدث خطأ أثناء إعداد الحساب');
       }
-    } catch (err) {
-      setError('تعذر الاتصال بالسيرفر، يرجى التأكد من تشغيل الخلفية (Backend)');
+    } catch (err: unknown) {
+      const message = axios.isAxiosError(err)
+        ? err.response?.data?.message || err.message
+        : err instanceof Error
+          ? err.message
+          : 'حدث خطأ غير متوقع أثناء إعداد الحساب';
+      setError(`تعذر إنشاء الحساب: ${message}`);
     } finally {
       setLoading(false);
     }
