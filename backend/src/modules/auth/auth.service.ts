@@ -145,6 +145,7 @@ export class AuthService {
       };
     } catch (error) {
       console.error('Setup Admin Error:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
 
       if (error instanceof BadRequestException) {
         throw error;
@@ -155,14 +156,16 @@ export class AuthService {
         (error instanceof Prisma.PrismaClientKnownRequestError &&
           ['P1001', 'P1002', 'P1017', 'P2024'].includes(error.code))
       ) {
-        throw new ServiceUnavailableException('تعذر الاتصال بقاعدة البيانات Neon، يرجى التحقق من DATABASE_URL والمحاولة لاحقاً');
+        throw new ServiceUnavailableException(
+          `تعذر الاتصال بقاعدة البيانات Neon، يرجى التحقق من DATABASE_URL والمحاولة لاحقاً: ${errorMessage}`,
+        );
       }
 
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         throw new BadRequestException('اسم المستخدم أو المتجر مسجل مسبقاً');
       }
 
-      throw new InternalServerErrorException('تعذر إنشاء حساب المسؤول بسبب خطأ في قاعدة البيانات');
+      throw new InternalServerErrorException(`تعذر إنشاء حساب المسؤول بسبب خطأ في قاعدة البيانات: ${errorMessage}`);
     }
   }
 
