@@ -1,7 +1,13 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { User, UserRole } from '@prisma/client';
+import { Prisma, User, UserRole } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
@@ -97,34 +103,67 @@ export class AuthService {
       throw new BadRequestException('يرجى إدخال اسم المتجر واسم المستخدم وكلمة المرور كامليْن');
     }
 
-    if (await this.prisma.user.count() > 0) {
-      throw new BadRequestException('تم إعداد النظام مسبقاً، لا يمكن إنشاء حساب مسؤول جديد عبر هذا المسار');
-    }
-
     const username = usernameInput.trim();
     const storeName = storeNameInput.trim();
     const passwordHash = await bcrypt.hash(password, 12);
     const storeId = randomUUID();
-    const newAdmin = await this.prisma.$transaction(async (tx) => {
-      await tx.store.create({ data: { id: storeId, name: storeName } });
-      await tx.storeSettings.create({ data: { storeId, storeName } });
-      return tx.user.create({
-        data: {
-          username,
-          fullName: 'المدير العام',
-          passwordHash,
-          role: UserRole.SUPER_ADMIN,
-          isActive: true,
-          storeId,
-        },
-      });
-    });
 
-    return {
-      success: true,
-      message: 'تم إنشاء حساب المسؤول الرئيسي بنجاح',
-      userId: newAdmin.id,
-    };
+    try {
+      const [existingUser, existingStore, userCount] = await Promise.all([
+        this.prisma.user.findUnique({ where: { username } }),
+        this.prisma.store.findFirst({ where: { name: storeName } }),
+        this.prisma.user.count(),
+      ]);
+
+      if (existingUser || existingStore) {
+        throw new BadRequestException('اسم المستخدم أو المتجر مسجل مسبقاً');
+      }
+
+      if (userCount > 0) {
+        throw new BadRequestException('تم إعداد النظام مسبقاً، لا يمكن إنشاء حساب مسؤول جديد عبر هذا المسار');
+      }
+
+      const newAdmin = await this.prisma.$transaction(async (tx) => {
+        await tx.store.create({ data: { id: storeId, name: storeName } });
+        await tx.storeSettings.create({ data: { storeId, storeName } });
+        return tx.user.create({
+          data: {
+            username,
+            fullName: 'المدير العام',
+            passwordHash,
+            role: UserRole.SUPER_ADMIN,
+            isActive: true,
+            storeId,
+          },
+        });
+      });
+
+      return {
+        success: true,
+        message: 'تم إنشاء حساب المسؤول الرئيسي بنجاح',
+        userId: newAdmin.id,
+      };
+    } catch (error) {
+      console.error('Setup Admin Error:', error);
+
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
+      if (
+        error instanceof Prisma.PrismaClientInitializationError ||
+        (error instanceof Prisma.PrismaClientKnownRequestError &&
+          ['P1001', 'P1002', 'P1017', 'P2024'].includes(error.code))
+      ) {
+        throw new ServiceUnavailableException('تعذر الاتصال بقاعدة البيانات Neon، يرجى التحقق من DATABASE_URL والمحاولة لاحقاً');
+      }
+
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new BadRequestException('اسم المستخدم أو المتجر مسجل مسبقاً');
+      }
+
+      throw new InternalServerErrorException('تعذر إنشاء حساب المسؤول بسبب خطأ في قاعدة البيانات');
+    }
   }
 
   /** تعيين/تغيير PIN الخاص بالمستخدم الحالي - يتطلب تأكيد كلمة السر لأمان إضافي */
